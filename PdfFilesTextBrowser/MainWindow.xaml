@@ -1,0 +1,66 @@
+﻿<Window x:Class="PdfFilesTextBrowser.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:PdfFilesTextBrowser"
+        mc:Ignorable="d"
+        Title="Pdf File Text Browser" Height="450" Width="800" WindowState="Maximized">
+    <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto"/>
+      <ColumnDefinition/>
+    </Grid.ColumnDefinitions>
+
+    <Rectangle Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Grid.ColumnSpan="2" Fill="Gainsboro"/>
+    <Button Grid.Row="0" Grid.Column="0" x:Name="DirectoryButton" Content="_Directory" Margin="4,4,4,2"/>
+    <TextBox Grid.Row="0" Grid.Column="1" x:Name="DirectoryTextBox" VerticalAlignment="Center"/>
+
+    <Button Grid.Row="1" Grid.Column="0" x:Name="FileButton" Content="_File" Margin="4,2,4,4"/>
+    <TextBox Grid.Row="1" Grid.Column="1" x:Name="FileTextBox" VerticalAlignment="Center"/>
+
+    <Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition/>
+        <ColumnDefinition Width="auto"/>
+        <ColumnDefinition/>
+      </Grid.ColumnDefinitions>
+
+      <TabControl Grid.Column="0" x:Name="PagesTabControl" TabStripPlacement="Bottom"/>
+      <GridSplitter Grid.Column="1" Width="5" VerticalAlignment="Stretch" 
+                  ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" >
+        <GridSplitter.Background>
+          <LinearGradientBrush EndPoint="1, 0.5" StartPoint="0, 0.5">
+            <GradientStop Color="AntiqueWhite" Offset="0" />
+            <GradientStop Color="DarkGray" Offset="1" />
+          </LinearGradientBrush>
+        </GridSplitter.Background>
+      </GridSplitter>
+      <WebBrowser Grid.Column="2" x:Name="PdfWebBrowser"/>
+      <TextBox Grid.Column="2" x:Name="PdfTextBox"/>
+    </Grid>
+
+    <StatusBar Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" >
+      <StatusBarItem>
+        <Button x:Name="PreviousButton" Content="_Prev"/>
+      </StatusBarItem>
+      <StatusBarItem>
+        <Button x:Name="NextButton" Content="_Next"/>
+      </StatusBarItem>
+      <Separator/>
+      <StatusBarItem>
+        <Button x:Name="FindButton" Content="_Find ^f"/>
+      </StatusBarItem>
+      <Separator/>
+      <StatusBarItem x:Name="BackStatusBarItem" Visibility="Collapsed">
+        <Button x:Name="BackButton" Content="_Back"/>
+      </StatusBarItem>
+    </StatusBar>
+  </Grid>
+</Window>
