@@ -22,6 +22,7 @@ namespace PdfFilesTextBrowser {
     readonly TextBox? streamTextBox;
     readonly Action callOwnerWhenClosing;
     readonly TextBox? searchedTextBox;
+    readonly TextViewer? searchedTextViewer;
     readonly RichTextBox? searchedRichTextBox;
 
 
@@ -36,16 +37,27 @@ namespace PdfFilesTextBrowser {
       InitializeComponent();
 
       if (pagesTabControl is null) {
+        //called from PdfStreamWindow
         searchedTextBox = streamTextBox!;
         TextTextbox.Text = searchedTextBox.SelectedText;
+        AllPagesLabel.Visibility = Visibility.Collapsed;
+        AllPagesCheckBox.Visibility = Visibility.Collapsed;
+
       } else {
+        //called from MainWindow
         var selectedTabItem = ((TabItem)pagesTabControl.SelectedItem).Content;
         if (selectedTabItem is TextBox isTextBox) {
           searchedTextBox = isTextBox;
           TextTextbox.Text = searchedTextBox.SelectedText;
+        } else if (selectedTabItem is TextViewer isTextViewer) {
+          searchedTextViewer = isTextViewer;
+
         } else if (selectedTabItem is RichTextBox isRichTextBox) {
           searchedRichTextBox = isRichTextBox;
           TextTextbox.Text = searchedRichTextBox.Selection.Text;
+        } else {
+          System.Diagnostics.Debugger.Break();
+          throw new NotSupportedException();
         }
 
       }
@@ -70,13 +82,13 @@ namespace PdfFilesTextBrowser {
     }
 
 
-    private void locationTextbox_PreviewTextInput(object sender, TextCompositionEventArgs e) {
-      if (e.Text.Length!=1) {
-        System.Diagnostics.Debugger.Break();
-      }
-      var c = e.Text[0];
-      e.Handled = c<'0' || c>'9';
-    }
+    //private void locationTextbox_PreviewTextInput(object sender, TextCompositionEventArgs e) {
+    //  if (e.Text.Length!=1) {
+    //    System.Diagnostics.Debugger.Break();
+    //  }
+    //  var c = e.Text[0];
+    //  e.Handled = c<'0' || c>'9';
+    //}
 
 
     private void findWindow_Loaded(object sender, RoutedEventArgs e) {
@@ -94,7 +106,7 @@ namespace PdfFilesTextBrowser {
     public void FindNext() {
       var stringComparison =
           IgnoreCaseCheckBox.IsChecked!.Value ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-      if (searchedTextBox!=null) {
+      if (searchedTextBox is not null) {
         var actualPosition = searchedTextBox.SelectionStart + 1;
         actualPosition = searchedTextBox.Text.IndexOf(TextTextbox.Text, actualPosition, stringComparison);
         if (actualPosition<0) {
@@ -104,11 +116,13 @@ namespace PdfFilesTextBrowser {
             return;
           }
         }
-
         searchedTextBox.Focus();
         searchedTextBox.Select(actualPosition, TextTextbox.Text.Length);
 
-      } else {
+      } else if (searchedTextViewer is not null) {
+        searchedTextViewer.Search(TextTextbox.Text, isForward: true, IgnoreCaseCheckBox.IsChecked!.Value);
+
+      } else if (searchedRichTextBox is not null){
         TextPointer startTextPointer;
         bool isSearchFromMiddle;
         if (searchedRichTextBox!.Selection.IsEmpty) {

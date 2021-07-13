@@ -35,7 +35,7 @@ namespace PdfParserTest {
       var stringBuilder = new StringBuilder();
       foreach (var file in dir.GetFiles("*.pdf")) {
         if (fileCount>10) {
-          var pdfParser = new PdfParser(file.FullName, "|", streamBuffer, stringBuilder);
+          var pdfParser = new PdfParser(file.FullName, "|", "", streamBuffer, stringBuilder);
           System.Diagnostics.Debug.WriteLine(pdfParser.Tokeniser.Pages.Count + " " + file.FullName);
         }
         fileCount++;

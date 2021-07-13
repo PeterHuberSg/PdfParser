@@ -1,0 +1,58 @@
+﻿$object Catalog
+  << /Type /Catalog
+      /Outlines §Outlines§
+      /Pages §Pages§
+  >>
+
+$object Outlines
+  << /Type /Outlines
+      /Count 0
+  >>
+
+$object Pages
+  << /Type /Pages
+      /Kids [ §Page1§ ]
+      /Count 1
+  >>
+
+$object Page1
+  << /Type /Page
+      /Parent §Pages§
+      /MediaBox [ 0 0 612 792 ]
+      /Contents [§Page1Content1§ §Page1Content2§]
+      /Resources << /ProcSet §ResourcesProcSet§
+      /Font << /F1 §HelveticaFont§ >>
+  >>
+>>
+
+$object ResourcesProcSet
+  [ /PDF /Text ]
+
+$object HelveticaFont
+  << /Type /Font
+    /Subtype /Type1
+    /Name /F1
+    /BaseFont /Helvetica
+    /Encoding /MacRomanEncoding
+  >>
+
+$object Page1Content1
+  << /Length # >>
+stream
+  BT
+    /F1 24 Tf
+    200 600 Td
+    ( Hello World ) Tj
+  ET
+endstream
+
+$object Page1Content2
+  << /Length # >>
+stream
+  BT
+    /F1 12 Tf
+    200 500 Td
+    (some more text) Tj
+  ET
+endstream
+

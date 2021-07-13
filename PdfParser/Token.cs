@@ -25,7 +25,7 @@ namespace PdfParserLib {
     protected Token(Tokeniser tokeniser, ObjectId? objectId) {
       ObjectId = objectId;
       //Address = -1;
-      if (objectId!=null) {
+      if (objectId!=null && !(this is RefToken)) {
         tokeniser.AddToTokens(this);
       }
     }
@@ -174,6 +174,17 @@ namespace PdfParserLib {
     }
 
 
+    public NumberToken(Tokeniser tokeniser, decimal number) : base(tokeniser, objectId: null) {
+      Decimal = number;
+    }
+
+
+    public NumberToken(Tokeniser tokeniser, int number): base(tokeniser, objectId: null) {
+      Decimal = number;
+      Integer = number;
+    }
+
+
     public override void ToStringBuilder(StringBuilder sb) {
       if (Integer.HasValue) {
         sb.Append($"{Integer}");
@@ -188,7 +199,8 @@ namespace PdfParserLib {
   public class StringToken: Token {
 
 
-    public string Value { get; }
+    public string Value { get; private set; }
+    public byte[]? HexBytes { get; }
 
 
     public StringToken(Tokeniser tokeniser, ObjectId? objectId) : base(tokeniser, objectId) {
@@ -230,12 +242,56 @@ namespace PdfParserLib {
           b = tokeniser.GetNextByte();
         }
         tokeniser.StringBuilder.Append('>');
+        if (tokeniser.StringBuilder.Length % 2 == 0) {
+          HexBytes = new byte[(tokeniser.StringBuilder.Length-2) / 2];
+          var sbIndex = 1;
+          for (int HexBytesIndex = 0; HexBytesIndex < HexBytes.Length; HexBytesIndex++) {
+            var char0 = tokeniser.StringBuilder[sbIndex++];
+            var int0 = convertHexChar(char0);
+            if (int0<0) {
+              HexBytes = null;
+              break;
+            }
+            var char1 = tokeniser.StringBuilder[sbIndex++];
+            var int1 = convertHexChar(char1);
+            if (int1<0) {
+              HexBytes = null;
+              break;
+            }
+            HexBytes[HexBytesIndex] = (byte)(int0 * 16 + int1);
+          }
+        }
+
       } else {
         throw tokeniser.Exception($"String format error, '(' or '<' expected as leading character, but was '{(char)b}'.");
       }
-      Value = tokeniser.StringBuilder.ToString();
-      tokeniser.GetNextByte(); 
+      if (tokeniser.IsStringNeedsDecryption) {
+        Value = tokeniser.DecryptString(objectId!.Value, tokeniser.StringBuilder.ToString());
+
+      } else {
+        Value = tokeniser.StringBuilder.ToString();
+      }
+      tokeniser.GetNextByte();
       //tokeniser.ValidateDelimiter(Tokeniser.ErrorEnum.String);
+    }
+
+
+    internal void DecryptValue(ObjectId objectId, Tokeniser tokeniser) {
+      Value = tokeniser.DecryptString(objectId, Value);
+    }
+
+
+    private int convertHexChar(char char0) {
+      if (char0>='0' && char0<='9') {
+        return char0-'0';
+      } else if (char0>='A' && char0<='F') {
+        return 10 + char0-'A';
+      } else if (char0>='a' && char0<='f') {
+        return 10 + char0-'a';
+      } else {
+        System.Diagnostics.Debugger.Break();
+        return -1;
+      }
     }
 
 
@@ -310,16 +366,24 @@ namespace PdfParserLib {
 
     public ArrayToken(Tokeniser tokeniser, Token token) : base(tokeniser, objectId: null) {
       this.tokeniser = tokeniser;
-      tokens = new List<Token>();
-      tokens.Add(token);
+      tokens = new List<Token> {
+        token
+      };
     }
 
 
     public Token this[int index] {
       get {
-        var token = tokens[index];
+        //var token = tokens[index];
+        Token token;
+        try {
+          token = tokens[index];
+        } catch (Exception ex) {
+
+          throw;
+        }
         if (token is RefToken refToken) {
-          token = tokeniser.GetReferencedToken(refToken.ObjectId!.Value);
+          token = tokeniser.GetToken(refToken.ObjectId!.Value);
           tokens[index] = token;
         }
         return token;
@@ -371,9 +435,13 @@ namespace PdfParserLib {
     public int StreamStartIndex { get; }
     public int Length { get; }
     public bool IsStream { get{ return StreamStartIndex>=0; } }
+    public bool IsDecrypted { get; internal set; }
+    public string? StreamLengthProblem { get; internal set; }
     Dictionary<string, Token> tokens { get; }
-    string[] keys; //GetEnumerator() needs a collection (well, array) which doesn't change. The iterator might change tokens during foreach loop.
-    Tokeniser tokeniser;
+    public IReadOnlyList<string> Keys => keys;
+
+    readonly string[] keys; //GetEnumerator() needs a collection (well, array) which doesn't change. The iterator might change tokens during foreach loop.
+    readonly Tokeniser tokeniser;
 
 
     public DictionaryToken(Tokeniser tokeniser, ObjectId? objectId) : base(tokeniser, objectId) {
@@ -416,10 +484,14 @@ namespace PdfParserLib {
         b = tokeniser.SkipWhiteSpace();
       }
       tokeniser.GetNextByte();
-      tokeniser.GetNextByte();
-
-      StreamStartIndex = tokeniser.GetStreamStartIndex(this, out var length);
-      Length = length;
+      if (tokeniser.IsEndOfBuffer()) {
+        StreamStartIndex = int.MinValue;
+        Length = int.MinValue;
+      } else {
+        tokeniser.GetNextByte();
+        StreamStartIndex = tokeniser.GetStreamStartIndex(this, out var length);
+        Length = length;
+      }
       keys = tokens.Keys.ToArray();
     }
 
@@ -428,29 +500,20 @@ namespace PdfParserLib {
       get {
         var token = tokens[key];
         if (token is RefToken refToken) {
-          try {
-            token = tokeniser.GetReferencedToken(refToken.ObjectId!.Value);
-          } catch (Exception ex) {
-            System.Diagnostics.Debugger.Break();
-            throw ex;
-          }
+          token = tokeniser.GetToken(refToken.ObjectId!.Value);
           tokens[key] = token;
         }
-        //if (token is RefToken refToken) {
-        //  token = tokeniser.GetReferencedToken(refToken.ObjectId!.Value);
-        //  tokens[key] = token;
-        //}
         return token;
       }
     }
 
 
-    internal bool ContainsKey(string key) {
+    public bool ContainsKey(string key) {
       return tokens.ContainsKey(key);
     }
 
 
-    internal bool TryGetValue(string key, [MaybeNullWhen(false)] out Token token) {
+    public bool TryGetValue(string key, [MaybeNullWhen(false)] out Token token) {
       if (!tokens.ContainsKey(key)) {
         token = null;
         return false;
@@ -460,7 +523,7 @@ namespace PdfParserLib {
     }
 
 
-    internal bool TryGetName(string key, [MaybeNullWhen(false)] out string name) {
+    public bool TryGetName(string key, [MaybeNullWhen(false)] out string name) {
       if (!tokens.ContainsKey(key)) {
         name = null;
         return false;
@@ -474,7 +537,21 @@ namespace PdfParserLib {
     }
 
 
-    internal bool TryGetArray(string key, [MaybeNullWhen(false)] out ArrayToken token) {
+    public bool TryGetNumber(string key, [MaybeNullWhen(false)] out NumberToken numberToken) {
+      if (!tokens.ContainsKey(key)) {
+        numberToken = null;
+        return false;
+      }
+
+      numberToken = this[key] as NumberToken;
+      if (numberToken is null) {
+        return false;
+      }
+      return true;
+    }
+
+
+    public bool TryGetArray(string key, [MaybeNullWhen(false)] out ArrayToken token) {
       if (!tokens.ContainsKey(key)) {
         token = null;
         return false;
@@ -488,7 +565,7 @@ namespace PdfParserLib {
     }
 
 
-    internal bool TryGetDictionary(string key, [MaybeNullWhen(false)] out DictionaryToken token) {
+    public bool TryGetDictionary(string key, [MaybeNullWhen(false)] out DictionaryToken token) {
       if (!tokens.ContainsKey(key)) {
         token = null;
         return false;
@@ -498,6 +575,39 @@ namespace PdfParserLib {
       if (token is null) {
         return false;
       }
+      return true;
+    }
+
+
+    public bool TryGetString(string key, [MaybeNullWhen(false)] out string stringValue) {
+      if (!tokens.ContainsKey(key)) {
+        stringValue = null;
+        return false;
+      }
+
+      var stringToken = this[key] as StringToken;
+      if (stringToken is null) {
+        stringValue = null;
+        return false;
+      }
+      stringValue = stringToken.Value;
+      return true;
+    }
+
+
+    public bool TryGetHexBytes(string key, [MaybeNullWhen(false)] out byte[] hexBytes) {
+      if (!tokens.ContainsKey(key)) {
+        hexBytes = null;
+        return false;
+      }
+
+      var stringToken = this[key] as StringToken;
+      if (stringToken is null || stringToken.HexBytes is null) {
+        hexBytes = null;
+        return false;
+      }
+
+      hexBytes = stringToken.HexBytes;
       return true;
     }
 
@@ -531,12 +641,30 @@ namespace PdfParserLib {
         } else if (filterString=="FlateDecode") {
           filter = Tokeniser.FilterEnum.FlateDecode;
         } else {
-          throw new NotSupportedException();
+          throw new NotSupportedException($"Stream filter {filterString} is not (yet) supported.");
         }
       } else {
         filter = Tokeniser.FilterEnum.None;
       }
-      tokeniser.FillStreamBytes(StreamStartIndex, Length, filter);
+      tokeniser.FillStreamBytes(this, filter);
+
+      //translate stream with predictor if necessary
+      if (TryGetDictionary("DecodeParms", out var decodeParmsDictionaryToken)) {
+
+        if (!decodeParmsDictionaryToken.TryGetNumber("Columns", out var columnsNumber)) {
+          throw tokeniser.Exception($"Stream DecodeParms are missing Columns parameter.");
+        }
+
+        if (!decodeParmsDictionaryToken.TryGetNumber("Predictor", out var predictorNumber)) {
+          throw tokeniser.Exception($"Stream DecodeParms are missing Predictor parameter.");
+        }
+        if (predictorNumber.Integer!.Value!=12) {
+          throw tokeniser.Exception($"Stream DecodeParms Predictor parameter should be 12.");
+        }
+
+        tokeniser.ApplyPredictorUp(columnsNumber.Integer!.Value);
+      }
+
       return tokeniser;
     }
 

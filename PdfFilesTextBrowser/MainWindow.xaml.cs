@@ -27,28 +27,39 @@ namespace PdfFilesTextBrowser {
   /// </summary>
   public partial class MainWindow: Window {
 
-    readonly Stack<PdfSourceRichTextBox.PdfRefRun> pdfRefRunTrace;
+    readonly TextViewer bytesTextViwer;
+    //readonly Stack<PdfSourceRichTextBox.PdfRefRun> pdfRefRunTrace;
+    const int maxPages = 20;
 
 
     public MainWindow() {
-      pdfRefRunTrace = new Stack<PdfSourceRichTextBox.PdfRefRun>();
+      //pdfRefRunTrace = new Stack<PdfSourceRichTextBox.PdfRefRun>();
       InitializeComponent();
+      bytesTextViwer = new(this);
+
+      MainPdfViewer.MaxPages = maxPages;
 
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\Invest\CS";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\Invest\DBS";
 
-      FileTextBox.Text = @"C:\Users\peter\Source\Repos\PdfParser\XRefUpdater\H3 Simple Text String Example Updated.pdf";
+      //FileTextBox.Text = @"C:\Users\peter\Source\Repos\PdfParser\XRefUpdater\PdfTestSample.pdf";
+      //FileTextBox.Text = @"C:\Users\peter\Source\Repos\PdfParser\XRefUpdater\H3 Simple Text String Example Updated.pdf";
       //FileTextBox.Text = @"C:\Users\peter\Source\Repos\PdfParser\PdfParserTest\H3 Simple Text String Example.pdf";
       //FileTextBox.Text = @"C:\Users\peter\Source\Repos\PdfParser\PdfParserTest\file-sample_150kB.pdf";
       //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\Invest\CS\1224799-50_closing_statement_2016-01-01.PDF";
-      //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\AHV\AnmeldungAHV2019.pdf";
       //FileTextBox.Text = @"D:\PDF32000_2008.pdf";
       //FileTextBox.Text = @"D:\1.15443971L-2019-10-16.pdf";
       //FileTextBox.Text = @"D:\Abmelung Horgen.pdf";
       //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\AHV\Huber Juerg Peter - rf_2013_7566952682341_.pdf";
       //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\AHV\AnmeldungAHV2019.pdf";
-      FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\BDSM\climbing_hitches.pdf";
+      //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\BDSM\climbing_hitches.pdf";
+      //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\AHV\AnmeldungAHV2019.pdf";
+      FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202004.pdf";
+      //FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202104.pdf";
+      //FileTextBox.Text = @"D:\PDF32000_2008.pdf";
+
+      //xref stream
 
       if (DirectoryTextBox.Text.Length>0 || FileTextBox.Text.Length>0) {
         nextButton_Click(NextButton, new RoutedEventArgs());
@@ -142,21 +153,21 @@ namespace PdfFilesTextBrowser {
     }
 
 
-    internal void AddToTrace(PdfSourceRichTextBox.PdfRefRun pdfRefRun) {
-      if (pdfRefRunTrace.Count==0) {
-        BackStatusBarItem.Visibility = Visibility.Visible;
-      }
-      pdfRefRunTrace.Push(pdfRefRun);
-    }
+    //internal void AddToTrace(PdfSourceRichTextBox.PdfRefRun pdfRefRun) {
+    //  if (pdfRefRunTrace.Count==0) {
+    //    BackStatusBarItem.Visibility = Visibility.Visible;
+    //  }
+    //  pdfRefRunTrace.Push(pdfRefRun);
+    //}
 
 
     private void backButton_Click(object sender, RoutedEventArgs e) {
-      var pdfObjectRun = pdfRefRunTrace.Pop()!;
-      pdfObjectRun.SetFocus();
-      if (pdfRefRunTrace.Count==0) {
-        pdfRefRunTrace.Clear();
-        BackStatusBarItem.Visibility = Visibility.Collapsed;
-      }
+      //var pdfObjectRun = pdfRefRunTrace.Pop()!;
+      //pdfObjectRun.SetFocus();
+      //if (pdfRefRunTrace.Count==0) {
+      //  pdfRefRunTrace.Clear();
+      //  BackStatusBarItem.Visibility = Visibility.Collapsed;
+      //}
     }
 
 
@@ -182,7 +193,7 @@ namespace PdfFilesTextBrowser {
 
 
     private void navigate(bool isNext) {
-      pdfRefRunTrace.Clear();
+      //pdfRefRunTrace.Clear();
       BackStatusBarItem.Visibility = Visibility.Collapsed;
 
       //check if user has changed file or directory
@@ -193,7 +204,7 @@ namespace PdfFilesTextBrowser {
           return;
         }
         fileString = FileTextBox.Text;
-        directoryString = fileInfo.DirectoryName;
+        directoryString = fileInfo.DirectoryName!;
         DirectoryTextBox.Text = directoryString;
         files.Clear();
         dirs.Clear();
@@ -269,102 +280,66 @@ namespace PdfFilesTextBrowser {
         }
       }
 
+      //remove old pages
       var file = allFiles[currentFileIndex];
       FileTextBox.Text = file.FullName;
       fileString = FileTextBox.Text;
       PagesTabControl.Items.Clear();
+
+      //display pdf
+      try {
+        MainPdfViewer.Visibility = Visibility.Visible;
+        PdfTextBox.Visibility = Visibility.Collapsed;
+        MainPdfViewer.PdfPath = file.FullName;
+
+      } catch (Exception ex) {
+        MainPdfViewer.Visibility = Visibility.Collapsed;
+        PdfTextBox.Visibility = Visibility.Visible;
+        PdfTextBox.Text = ex.ToDetailString();
+      }
+
+      //parse pdf
       PdfParser pdfParser;
       try {
-        pdfParser = new PdfParser(file.FullName, "|", streamBuffer, stringBuilder);
+        pdfParser = new PdfParser(file.FullName, "", "|", streamBuffer, stringBuilder);
       } catch (Exception ex) {
-        var pageTabItem = new TabItem {
+        var exceptionTabItem = new TabItem {
           Header = "E_xception"
         };
         var bytes = "";
         if (ex is PdfException pdfException) {
           bytes = Environment.NewLine + Environment.NewLine + pdfException.Tokeniser.ShowBufferContent();
         }
-        var textBox = new TextBox {
+        var exceptionTextBox = new TextBox {
           Text = ex.ToDetailString() + bytes,
-          VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-          IsReadOnly = true
-        };
-        pageTabItem.Content = textBox;
-        PagesTabControl.Items.Add(pageTabItem);
-        PagesTabControl.SelectedIndex = 0;
-        return;
-      }
-
-      try {
-        PdfWebBrowser.Visibility = Visibility.Visible;
-        PdfTextBox.Visibility = Visibility.Collapsed;
-        var fileUri = new Uri(new Uri("file://"), file.FullName);
-        PdfWebBrowser.Navigate(fileUri);
-        //if (PdfWebBrowser.Source?.AbsolutePath!=file.FullName) {
-        //  //couldn't find file
-        //  PdfWebBrowser.Navigate(new Uri("about:blank"));
-        //}
-
-      } catch (Exception ex) {
-        PdfWebBrowser.Visibility = Visibility.Collapsed;
-        PdfTextBox.Visibility = Visibility.Visible;
-        PdfTextBox.Text = ex.ToDetailString();
-      }
-
-      var pageIndex = 0;
-      foreach (var page in pdfParser.Pages) {
-        //todo: How to deal with pdf documents having more than 20 pages ?
-        if (pageIndex>20) break;
-
-        var hasException = false;
-        var underline = "";
-        if (pageIndex<10) {
-          underline = "_";
-        }
-        var pageTabItem = new TabItem {
-          Header = underline + pageIndex++
-        };
-        stringBuilder.Clear();
-        var isFirstContent = true;
-        foreach (var content in page.Contents) {
-          if (isFirstContent) {
-            isFirstContent = false;
-          } else {
-            stringBuilder.AppendLine(new string('-', 80));
-          }
-          stringBuilder.AppendLine(content.Text);
-          if (content.Exception!=null) {
-            hasException = true;
-            stringBuilder.AppendLine(new string('+', 80));
-            stringBuilder.AppendLine(content.Exception);
-            stringBuilder.AppendLine(new string('+', 80));
-          }
-          if (content.Error!=null) {
-            hasException = true;
-            stringBuilder.AppendLine(new string('+', 80));
-            stringBuilder.AppendLine(content.Error);
-            stringBuilder.AppendLine(new string('+', 80));
-          }
-        }
-
-        if (page.Exception!=null) {
-          hasException = true;
-          stringBuilder.AppendLine(new string('+', 80));
-          stringBuilder.AppendLine(page.Exception);
-          stringBuilder.AppendLine(new string('+', 80));
-        }
-        var textBox = new TextBox {
-          Text = stringBuilder.ToString(),
           VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
           HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
           IsReadOnly = true
         };
+        exceptionTabItem.Content = exceptionTextBox;
+        PagesTabControl.Items.Add(exceptionTabItem);
+        PagesTabControl.SelectedIndex = 0;
+        return;
+      }
 
-        if (hasException) {
-          pageTabItem.Background = Brushes.Khaki;
+      var pageIndex = 0;
+      if (pdfParser.Pages.Count>maxPages) {
+        var pageTabItem = new TabItem {
+          Header = pageIndex
+        };
+        addTabItemContent(pageTabItem, pdfParser.Pages[pageIndex]);
+
+      } else {
+        foreach (var page in pdfParser.Pages) {
+          var underline = "";
+          if (pageIndex<10) {
+            underline = "_";
+          }
+          var pageTabItem = new TabItem {
+            Header = underline + pageIndex++
+          };
+          addTabItemContent(pageTabItem, page);
         }
-        pageTabItem.Content = textBox;
-        PagesTabControl.Items.Add(pageTabItem);
       }
 
       var infoTabItem = new TabItem {
@@ -384,7 +359,7 @@ namespace PdfFilesTextBrowser {
         if (objectId_Token.Value is DictionaryToken objectDictionaryToken) {
           if (objectDictionaryToken.Type=="Font") {
             var pdfFont = (PdfFont)objectDictionaryToken.PdfObject!;
-            infotext += Environment.NewLine +  Environment.NewLine + pdfFont.Name + objectDictionaryToken.ToString();
+            infotext += Environment.NewLine +  Environment.NewLine + "Font (" + pdfFont.ObjectId?.ToShortString() + ')' + objectDictionaryToken.ToString();
             if (pdfFont.ToUnicodeHeader!=null) {
               infotext += Environment.NewLine + "ToUnicodeHeader: " + pdfFont.ToUnicodeHeader;
             }
@@ -443,12 +418,68 @@ namespace PdfFilesTextBrowser {
       //  ContextMenu = bytesContextMenu,
       //  IsReadOnly = true
       //  };
-      var pdfSourceRichTextBox = new PdfSourceRichTextBox(pdfParser.Tokeniser, stringBuilder, this);
-      bytesTabItem.Content = pdfSourceRichTextBox;
+      //////////////////////////////////////////////////////////////////////////
+
+
+      //var pdfSourceRichTextBox = new PdfSourceRichTextBox(pdfParser.Tokeniser, stringBuilder, this);
+      //bytesTabItem.Content = pdfSourceRichTextBox;
+      //bytesTabItem.Content = pdfSourceRichTextBox;
+      //PagesTabControl.Items.Add(bytesTabItem);
+
+      //PagesTabControl.SelectedIndex = 0;
+      //////////////////////////////////////////////////////////////////////////
+
+      bytesTextViwer.Load(tokeniser);
+      bytesTabItem.Content = bytesTextViwer;
       PagesTabControl.Items.Add(bytesTabItem);
 
       PagesTabControl.SelectedIndex = 0;
 
+    }
+
+    private void addTabItemContent(TabItem pageTabItem, PdfPage page) {
+      var hasException = false;
+      stringBuilder.Clear();
+      var isFirstContent = true;
+      foreach (var content in page.Contents) {
+        if (isFirstContent) {
+          isFirstContent = false;
+        } else {
+          stringBuilder.AppendLine(new string('-', 80));
+        }
+        stringBuilder.AppendLine(content.Text);
+        if (content.Exception!=null) {
+          hasException = true;
+          stringBuilder.AppendLine(new string('+', 80));
+          stringBuilder.AppendLine(content.Exception);
+          stringBuilder.AppendLine(new string('+', 80));
+        }
+        if (content.Error!=null) {
+          hasException = true;
+          stringBuilder.AppendLine(new string('+', 80));
+          stringBuilder.AppendLine(content.Error);
+          stringBuilder.AppendLine(new string('+', 80));
+        }
+      }
+
+      if (page.Exception!=null) {
+        hasException = true;
+        stringBuilder.AppendLine(new string('+', 80));
+        stringBuilder.AppendLine(page.Exception);
+        stringBuilder.AppendLine(new string('+', 80));
+      }
+      var textBox = new TextBox {
+        Text = stringBuilder.ToString(),
+        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+        IsReadOnly = true
+      };
+
+      if (hasException) {
+        pageTabItem.Background = Brushes.Khaki;
+      }
+      pageTabItem.Content = textBox;
+      PagesTabControl.Items.Add(pageTabItem);
     }
   }
 }

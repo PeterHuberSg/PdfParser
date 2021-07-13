@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="PdfStreamWindow" >
   <DockPanel>
-    <StatusBar DockPanel.Dock="Bottom">
+    <StatusBar x:Name="MainStatusBar" DockPanel.Dock="Bottom">
       <StatusBarItem>
         <StackPanel Orientation="Horizontal">
           <RadioButton x:Name="CharRadioButton" Content="_Char"/>

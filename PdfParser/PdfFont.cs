@@ -1,9 +1,27 @@
-﻿using System;
+﻿/**************************************************************************************
+
+PdfFont
+=======
+
+Pdf object storing font related data.
+
+Written in 2021 by Jürgpeter Huber, Singapore
+
+Contact: https://github.com/PeterHuberSg/PdfParser
+
+To the extent possible under law, the author(s) have dedicated all copyright and 
+related and neighboring rights to this software to the public domain worldwide under
+the Creative Commons 0 1.0 Universal license. 
+
+To view a copy of this license, read the file CopyRight.md or visit 
+http://creativecommons.org/publicdomain/zero/1.0
+
+This software is distributed without any warranty. 
+**************************************************************************************/
+
+using System;
 using System.Collections.Generic;
-using System.Data;
-using System.Diagnostics.SymbolStore;
 using System.Linq;
-using System.Text;
 
 
 namespace PdfParserLib {
@@ -11,7 +29,7 @@ namespace PdfParserLib {
 
   public class PdfFont {
 
-    public readonly string Name;
+    public readonly ObjectId? ObjectId;
     public readonly PdfFontTypeEnum FontType;
     public readonly string? BaseFont;
     public readonly string? EncodingName;
@@ -28,8 +46,8 @@ namespace PdfParserLib {
     bool hasFoundMissingChar;
 
 
-    public PdfFont(string name, Token token) {
-      Name = name;
+    public PdfFont(Token token) {
+      ObjectId = token.ObjectId;
       token.PdfObject = this;
       try {
         var fontDictionaryToken = (DictionaryToken)token;
@@ -109,7 +127,7 @@ namespace PdfParserLib {
 
 
     public override string ToString() {
-      var returnString = $"Font Name: {Name}: FontType: {FontType}; Encoding: {EncodingName}; BaseFont: {BaseFont};";
+      var returnString = $"Font ObjectId: {ObjectId}: FontType: {FontType}; Encoding: {EncodingName}; BaseFont: {BaseFont};";
       if (Exception is null) {
         return returnString;
       }

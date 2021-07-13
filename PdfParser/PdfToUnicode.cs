@@ -1,12 +1,32 @@
-﻿using System;
+﻿/**************************************************************************************
+
+PdfToUnicode
+============
+
+Translates bytes stored in a pdf file into Unicode
+
+Written in 2021 by Jürgpeter Huber, Singapore
+
+Contact: https://github.com/PeterHuberSg/PdfParser
+
+To the extent possible under law, the author(s) have dedicated all copyright and 
+related and neighboring rights to this software to the public domain worldwide under
+the Creative Commons 0 1.0 Universal license. 
+
+To view a copy of this license, read the file CopyRight.md or visit 
+http://creativecommons.org/publicdomain/zero/1.0
+
+This software is distributed without any warranty. 
+**************************************************************************************/
+
+using System;
 using System.Collections.Generic;
-using System.Text;
 
 
 namespace PdfParserLib {
 
 
-  public class PdfToUnitCode {
+  public class PdfToUnicode {
 
     public IReadOnlyList<char> Unicodes => unicodes;
     readonly char[] unicodes;
@@ -40,7 +60,7 @@ namespace PdfParserLib {
   // end
   // end
 
-    public PdfToUnitCode(DictionaryToken toUnicodeStream) {
+    public PdfToUnicode(DictionaryToken toUnicodeStream) {
       var tokeniser = toUnicodeStream.GetStreamBytes();
       if (tokeniser.GetStreamOpCode("begincmap") is null) 
         throw tokeniser.StreamException("ToUnicode stream is missing 'begincmap'.");

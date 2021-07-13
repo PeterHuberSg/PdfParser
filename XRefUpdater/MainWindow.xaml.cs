@@ -35,9 +35,27 @@ namespace XRefUpdater {
       UpdateButton.Click += updateButton_Click;
 
       xRefUpdaterDirectory = new DirectoryInfo(Environment.CurrentDirectory).Parent.Parent.Parent;
-      var file = xRefUpdaterDirectory.FullName + @"\H3 Simple Text String Example.pdf";
-      SourceTextBox.Text = File.ReadAllText(file);
-      update();
+      var fileSource = xRefUpdaterDirectory.FullName + @"\PdfTestSample.txt";
+      SourceTextBox.Text = File.ReadAllText(fileSource);
+      var sampleToPdf = new SampleToPdf(SourceTextBox.Text);
+      UpdatedTextBox.Text = sampleToPdf.Translate();
+
+      var bytes = new byte[UpdatedTextBox.Text.Length];
+      for (int bytesIndex = 0; bytesIndex < bytes.Length; bytesIndex++) {
+        bytes[bytesIndex] = (byte)UpdatedTextBox.Text[bytesIndex];
+      }
+      var fileDestination = xRefUpdaterDirectory.FullName + @"\PdfTestSample.pdf";
+      File.WriteAllBytes(fileDestination, bytes);
+
+      //var bytes = File.ReadAllBytes(fileDestination);
+      //var chars = UpdatedTextBox.Text;
+      //var length = Math.Min(bytes.Length, chars.Length);
+      //var sb = new StringBuilder();
+      //for (int i = 0; i < length; i++) {
+      //  sb.AppendLine($"{i:000} {(int)chars[i]} {chars[i]} {bytes[i]} {(char)bytes[i]}");
+      //}
+      //var s = sb.ToString();
+      //update();
     }
 
 
@@ -164,6 +182,15 @@ namespace XRefUpdater {
 
         case parseStateEnum.trailer:
           sb.Append(c);
+          //if (hasFound("/Size ", source, sourceIndex) {
+          //  //   << /Size 8
+          //  c = source[sourceIndex];
+          //  while (c>='0' && c<='9') {
+          //    c = source[++sourceIndex];
+          //  }
+          //  sb.AppendLine((objectAddresses.Count+1).ToString());
+
+          //}
           if (hasFound("startxref", source, sourceIndex)) {
             sb.AppendLine("tartxref");
             sb.AppendLine($"{xrefIndex}");

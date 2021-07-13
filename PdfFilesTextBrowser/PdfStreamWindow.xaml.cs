@@ -26,16 +26,16 @@ namespace PdfFilesTextBrowser {
     readonly StringBuilder sb;
 
 
-    readonly PdfSourceRichTextBox pdfSourceRichTextBox;
+    readonly TextViewer textViewer;
     static readonly FontFamily courierNewFontFamily = new FontFamily("Courier New");
 
 
-    public PdfStreamWindow(Tokeniser tokeniser, StringBuilder sb, ObjectId objectId, PdfSourceRichTextBox pdfSourceRichTextBox) {
+    public PdfStreamWindow(Tokeniser tokeniser, StringBuilder sb, ObjectId objectId, TextViewer textViewer) {
       this.tokeniser = tokeniser;
       this.sb = sb;
       ObjectId = objectId;
-      this.pdfSourceRichTextBox = pdfSourceRichTextBox;
-      Owner = pdfSourceRichTextBox.MainWindow;
+      this.textViewer = textViewer;
+      Owner = textViewer.OwnerWindow;
       Width = Owner.ActualWidth/2;
       Height = Owner.ActualHeight * 0.9;
       //var location = Owner.PointToScreen(new Point(Owner.Width*0, Owner.Height*0));
@@ -74,18 +74,36 @@ namespace PdfFilesTextBrowser {
 
     private void displayContent() {
       Title = $"{ObjectId} Stream";
-      var tokenStreamNullable = tokeniser.GetStream(ObjectId);
-      if (tokenStreamNullable is null) {
-        StreamTextBox.Text = sb.ToString();
+      MainStatusBar.IsEnabled = false;
+      if (tokeniser.IsDecryptionError) {
+        StreamTextBox.Text = "Decryption error";
         return;
       }
 
-      DictionaryToken? dictionaryToken;
-      (dictionaryToken, bytesMemory) = tokenStreamNullable.Value;
-      if (dictionaryToken!=null && dictionaryToken.PdfObject is PdfContent) {
-        displayContentStream(dictionaryToken);
-      } else {
+      try {
+        var tokenStreamNullable = tokeniser.GetStream(ObjectId);
+        if (tokenStreamNullable is null) {
+          StreamTextBox.Text = sb.ToString();
+          return;
+        }
+
+        DictionaryToken? dictionaryToken;
+        (dictionaryToken, bytesMemory) = tokenStreamNullable.Value;
+        MainStatusBar.IsEnabled = true;
+        if (dictionaryToken!=null) {
+          if (dictionaryToken.PdfObject is PdfContent) {
+            displayContentStream(dictionaryToken);
+            return;
+          }
+          if (dictionaryToken.Type=="ObjStm") {
+            displayOjectStream(dictionaryToken);
+            return;
+          }
+        }
         displayChar(isInitialising: true);
+      } catch (Exception ex) {
+        MainStatusBar.IsEnabled = false;
+        StreamTextBox.Text = "Can not display stream content because of exception: " + ex.Message;
       }
     }
 
@@ -170,8 +188,21 @@ namespace PdfFilesTextBrowser {
     private void displayContentStream(DictionaryToken contentDictionaryToken) {
       var fonts = ((PdfContent)contentDictionaryToken.PdfObject!).Fonts;
       var bytes = bytesMemory.Span;
+
+      //check how many cr and lf are in the first chunk of characters. If there are none, the Content is in a object stream and
+      //EOLs should get added to improve readability
+      var chunkLength = Math.Min(4*80+10, bytes.Length);
+      var lfCount = 0;
+      var crCount = 0;
+      for (int i = 0; i<chunkLength; i++) {
+        var b = bytes[i];
+        if (b=='\n') lfCount++;
+        if (b=='\r') crCount++;
+      }
+      lfCount = Math.Max(lfCount, crCount);
+      var areEOLsNeeded = lfCount==0 || (chunkLength/lfCount>80);
+
       sb.Clear();
-      var fontSb = new StringBuilder();
       if (bytes.Length<10) {
         for (int bytesIndex = 0; bytesIndex < bytes.Length-1; bytesIndex++) {
           append(sb, bytes[bytesIndex]);
@@ -181,8 +212,10 @@ namespace PdfFilesTextBrowser {
         return;
       }
 
+      var fontSb = new StringBuilder();
       var contentState = contentStateEnum.parse;
       var startBTIndex = int.MinValue;
+      var aqppendDelayedEOLCount = 0;
       char[]? fontEncoding = null;
       byte b0; 
       var b1 = (byte)' ';//"add" space before buffer in case the very first 2 characters are like BI or BT
@@ -212,7 +245,7 @@ namespace PdfFilesTextBrowser {
             while (true) {
               b3 = bytes[++bytesIndex];
               if (b3==')') {
-                //sb.Append(')'); not needed, will b3 will be later added to sb
+                //sb.Append(')'); not needed, b3 will be later added to sb
                 break;
               }
               var c = encoding[b3];
@@ -255,6 +288,9 @@ namespace PdfFilesTextBrowser {
             startBTIndex = int.MinValue;
             fontEncoding = null;
             contentState = contentStateEnum.parse;
+            if (areEOLsNeeded) {
+              aqppendDelayedEOLCount = 3;
+            }
           }
 
         } else {
@@ -263,8 +299,21 @@ namespace PdfFilesTextBrowser {
             switch (contentState) {
             case contentStateEnum.parse:
               if (b1=='B' && b2=='I') {
+                if (areEOLsNeeded) {
+                  sb.Length -= 2;
+                  sb.AppendLine();
+                  sb.AppendLine();
+                  sb.Append("BI");
+                }
                 contentState = contentStateEnum.BI;
+
               } else if (b1=='B' && b2=='T') {
+                if (areEOLsNeeded) {
+                  sb.Length -= 2;
+                  sb.AppendLine();
+                  sb.AppendLine();
+                  sb.Append("BT");
+                }
                 contentState = contentStateEnum.BT;
                 startBTIndex = bytesIndex;
               }
@@ -272,11 +321,21 @@ namespace PdfFilesTextBrowser {
 
             case contentStateEnum.BI:
               if (b1=='I' && b2=='D') {
+                if (areEOLsNeeded) {
+                  sb.Length -= 2;
+                  sb.AppendLine();
+                  sb.AppendLine();
+                  sb.Append("ID");
+                }
                 contentState = contentStateEnum.ID;
               }
               break;
+
             case contentStateEnum.ID:
               if (b1=='E' && b2=='I') {
+                if (areEOLsNeeded) {
+                  aqppendDelayedEOLCount = 3;
+                }
                 contentState = contentStateEnum.parse;
               }
               break;
@@ -287,6 +346,12 @@ namespace PdfFilesTextBrowser {
         }
 
         append(sb, b3);
+        if (aqppendDelayedEOLCount>0) {
+          aqppendDelayedEOLCount--;
+          if (aqppendDelayedEOLCount==0) {
+            sb.AppendLine();
+          }
+        }
       }
 
       StreamTextBox.Text = sb.ToString();
@@ -301,6 +366,46 @@ namespace PdfFilesTextBrowser {
       } else {
         sb.Append(c);
       }
+    }
+    #endregion
+
+
+    #region Object Stream
+    //      -------------
+
+    private void displayOjectStream(DictionaryToken dictionaryToken) {
+      var bytes = bytesMemory.Span;
+      sb.Clear();
+      var objectCount = ((NumberToken)dictionaryToken["N"]).Integer!.Value;
+      var first = ((NumberToken)dictionaryToken["First"]).Integer!.Value;
+      var objectId = tokeniser.GetStreamInt();
+      var offset = tokeniser.GetStreamInt() + first;
+      for (int objectIndex = 0; objectIndex < objectCount; objectIndex++) {
+        int objectIdNext;
+        int offsetNext;
+        if (objectIndex<objectCount-1) {
+          objectIdNext = tokeniser.GetStreamInt();
+          offsetNext = tokeniser.GetStreamInt() + first;
+        } else {
+          objectIdNext = -1;
+          offsetNext = bytes.Length;
+        }
+        if (sb.Length>0) {
+          sb.AppendLine();
+        }
+        sb.Append(objectId.ToString());
+        sb.Append(' ');
+        sb.AppendLine(offset.ToString());
+        for (int byteIndex = offset; byteIndex < offsetNext; byteIndex++) {
+          append(sb, bytes[byteIndex]);
+        }
+        sb.AppendLine();
+
+        objectId = objectIdNext;
+        offset = offsetNext;
+      }
+      StreamTextBox.Text = sb.ToString();
+      sb.Clear();
     }
     #endregion
 
@@ -353,7 +458,7 @@ namespace PdfFilesTextBrowser {
 
 
     private void pdfStreamWindow_Closed(object? sender, EventArgs e) {
-      pdfSourceRichTextBox.ResetStreamWindow();
+      textViewer.ResetStreamWindow();
       Owner.Activate();
     }
   }

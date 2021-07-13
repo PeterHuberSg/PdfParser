@@ -1,7 +1,26 @@
-﻿using System;
+﻿/**************************************************************************************
+
+PdfContent
+==========
+
+holds the content of a pdf Page
+
+Written in 2021 by Jürgpeter Huber, Singapore
+
+Contact: https://github.com/PeterHuberSg/PdfParser
+
+To the extent possible under law, the author(s) have dedicated all copyright and 
+related and neighboring rights to this software to the public domain worldwide under
+the Creative Commons 0 1.0 Universal license. 
+
+To view a copy of this license, read the file CopyRight.md or visit 
+http://creativecommons.org/publicdomain/zero/1.0
+
+This software is distributed without any warranty. 
+**************************************************************************************/
+
+using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
 
 
 namespace PdfParserLib {
@@ -12,14 +31,17 @@ namespace PdfParserLib {
     public readonly IReadOnlyDictionary<string, PdfFont> Fonts;
     public readonly string? PdfFontName;
     public readonly string? Text;
+    public readonly List<string> TextFragments;
     public readonly string? Exception;
     public readonly string? Error;
 
 
     public PdfContent(DictionaryToken contentsDictionaryToken, IReadOnlyDictionary<string, PdfFont> fonts) {
       contentsDictionaryToken.PdfObject = this;
+      Error = contentsDictionaryToken.StreamLengthProblem;
       var tokeniser = contentsDictionaryToken.GetStreamBytes();
       Fonts = fonts;
+      TextFragments = new List<string>();
       decimal? lastLineOffset = null;
       string? newText = null;
       try {
@@ -27,7 +49,9 @@ namespace PdfParserLib {
         ///R7 gs
         //0 0 0 rg
         //q
-        //8.33333 0 0 8.33333 0 0 cm BT
+        //8.33333 0 0 8.33333 0 0 cm
+
+        //322.8 648.48 31.92001 44.64001 re W n 
 
         //BT
         //  /F1 24 Tf
@@ -35,6 +59,7 @@ namespace PdfParserLib {
         //  ( Hello World ) Tj
         //ET
 
+        (decimal x, decimal y, decimal width, decimal height)? clippingRegion = null;
         while (true) {
           //find BT
           ReadOnlySpan<byte> opCodeSpan;
@@ -43,18 +68,37 @@ namespace PdfParserLib {
             if (opCode is null) return;
 
             opCodeSpan = opCode.Value.Span;
-            if (opCodeSpan.Length==2 && opCodeSpan[0]=='B' && opCodeSpan[1]=='I') {
-              tokeniser.SkipInlineImage();
-              continue;
+            if (opCodeSpan.Length==2) {
+              if (opCodeSpan[0]=='B' && opCodeSpan[1]=='I') {
+                tokeniser.ContentStreamSkipInlineImage();
+                continue;
+              }
+
+              if (opCodeSpan[0]=='r' && opCodeSpan[1]=='e') {
+                var cregion = tokeniser.ContentStreamGetClippingRegion();
+                if (cregion!=null) {
+                  //if (clippingRegion!=null && clippingRegion.Value.x + clippingRegion.Value.x) {
+
+                  //}
+                  clippingRegion = cregion;
+                  var s = 1.ToString();
+                  //////System.Diagnostics.Debug.WriteLine($"{(int)cregion.Value.x,3:D} {(int)cregion.Value.y,3:D} {(int)cregion.Value.width,3:D} {(int)cregion.Value.height,3:D} {(int)(cregion.Value.x + cregion.Value.width),3:D} {(int)(cregion.Value.y + cregion.Value.height),3:D}");
+                }
+                continue;
+              }
             }
+
+
           } while (opCodeSpan.Length!=2 || opCodeSpan[0]!='B' || opCodeSpan[1]!='T');
 
           //processes text operation until ET
+          tokeniser.MarkStreamStartOfTextFragment();
           PdfFont? font = null;
           while (true) {
             var opCode = tokeniser.GetStreamOpCode();//cannot return null (end of stream), because opCode ET must follow
             if (opCode is null) {
               Error += "Error Content stream: stream end found but 'ET' still missing." + Environment.NewLine;
+              Error += tokeniser.ShowStreamContentAtIndex();
               return;
             }
 
@@ -124,6 +168,7 @@ namespace PdfParserLib {
                 }
 
               } else if (opCodeSpan[0]=='E' && opCodeSpan[1]=='T') {
+                TextFragments.Add(tokeniser.GetStreamTextFragment());
                 break;
               
               } else {

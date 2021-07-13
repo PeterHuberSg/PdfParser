@@ -7,8 +7,12 @@ using PdfParserLib;
 
 
 namespace PdfParserTest {
+
+
   [TestClass]
   public class PdfParserTest {
+
+
     [TestMethod]
     public void TestPdfParser() {
       var sb = new StringBuilder();

@@ -11,7 +11,18 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeGenerator", "CodeGenera
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PdfFilesTextBrowser", "PdfFilesTextBrowser\PdfFilesTextBrowser.csproj", "{277346D1-B62A-4C73-8E34-69A090ED29AE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XRefUpdater", "XRefUpdater\XRefUpdater.csproj", "{B2691543-3A33-4FCC-B6A4-9CCE8A924F8E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XRefUpdater", "XRefUpdater\XRefUpdater.csproj", "{B2691543-3A33-4FCC-B6A4-9CCE8A924F8E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{755A0700-F8DD-4BD4-9449-4C2FCB6F35DA}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		CopyRight.MD = CopyRight.MD
+		PdfParser Design.docx = PdfParser Design.docx
+		PdfParser Design.pptx = PdfParser Design.pptx
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CustomControlBaseLib", "..\CustomControlBaseLib\CustomControlBaseLib\CustomControlBaseLib.csproj", "{F021A1C5-6A88-452C-BD34-F421B143DF78}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +50,10 @@ Global
 		{B2691543-3A33-4FCC-B6A4-9CCE8A924F8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B2691543-3A33-4FCC-B6A4-9CCE8A924F8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B2691543-3A33-4FCC-B6A4-9CCE8A924F8E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F021A1C5-6A88-452C-BD34-F421B143DF78}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F021A1C5-6A88-452C-BD34-F421B143DF78}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F021A1C5-6A88-452C-BD34-F421B143DF78}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F021A1C5-6A88-452C-BD34-F421B143DF78}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
