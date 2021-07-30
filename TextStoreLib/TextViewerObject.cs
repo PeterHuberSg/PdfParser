@@ -88,12 +88,12 @@ namespace PdfParserLib {
     public int DisplayLinesCount { get; private set; }
 
 
-    public int DisplayLineOffset { get; private set; }
+    public int DisplayAbsoluteLineOffset { get; private set; }
     
 
     public List<TextViewerObject> this[int lineIndex] {
       get {
-        lineIndex -= DisplayLineOffset;
+        lineIndex -= DisplayAbsoluteLineOffset;
         if (lineIndex>DisplayLinesCount) throw new ArgumentException();
 
         return objectsLines[lineIndex]; 
@@ -118,7 +118,7 @@ namespace PdfParserLib {
     }
 
 
-    public void Reset(int lineOffset) {
+    public void Reset(int absultelineOffset) {
       foreach (var objectsLine in objectsLines) {
         if (objectsLine.Count==0) continue;
 
@@ -127,7 +127,7 @@ namespace PdfParserLib {
       }
       ObjectsCount = 0;
       DisplayLinesCount = 0;
-      DisplayLineOffset = lineOffset;
+      DisplayAbsoluteLineOffset = absultelineOffset;
     }
     #endregion
 
@@ -138,8 +138,8 @@ namespace PdfParserLib {
     /// <summary>
     /// Add link based on line number as used in TextStore, not just display line number
     /// </summary>
-    public TextViewerObject AddLink(TextViewerAnchor anchor, int line, double startX, double endX) {
-      line -= DisplayLineOffset;
+    public TextViewerObject AddLink(TextViewerAnchor anchor, int absoluteline, double startX, double endX) {
+      var line = absoluteline - DisplayAbsoluteLineOffset;
       if (line>=objectsLines.Count) {
         for (int lineIndex = objectsLines.Count; lineIndex<=line; lineIndex++) {
           objectsLines.Add(new List<TextViewerObject>());
@@ -171,8 +171,8 @@ namespace PdfParserLib {
     /// <summary>
     /// Add stream based on line number as used in TextStore, not just display line number
     /// </summary>
-    public TextViewerObject AddStream(ObjectId objectId, int line, double startX, double endX) {
-      line -= DisplayLineOffset;
+    public TextViewerObject AddStream(ObjectId objectId, int absoluteLine, double startX, double endX) {
+      var line = absoluteLine - DisplayAbsoluteLineOffset;
       if (line>=objectsLines.Count) {
         for (int lineIndex = objectsLines.Count; lineIndex<=line; lineIndex++) {
           objectsLines.Add(new List<TextViewerObject>());

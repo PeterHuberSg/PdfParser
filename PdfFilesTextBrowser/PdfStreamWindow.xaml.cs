@@ -437,6 +437,12 @@ namespace PdfFilesTextBrowser {
           findWindow.FindNext();
           e.Handled = true;
         }
+      } else if (key==Key.Escape) {
+        if (findWindow!=null) {
+          e.Handled = true;
+          findWindow.Close();
+          findWindow = null;
+        }
       }
       base.OnKeyUp(e);
     }

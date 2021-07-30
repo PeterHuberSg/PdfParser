@@ -118,7 +118,7 @@ namespace PdfFilesTextBrowser {
       {
         e.Handled = true;
         if (findWindow is null) {
-          openFindWindow();
+          OpenFindWindow();
         } else {
           findWindow.Focus();
         }
@@ -129,11 +129,17 @@ namespace PdfFilesTextBrowser {
           e.Handled = true;
           findWindow.FindNext();
         }
+      } else if (key==Key.Escape) {
+        if (findWindow!=null) {
+          e.Handled = true;
+          findWindow.Close();
+          findWindow = null;
+        }
       }
     }
 
 
-    private void openFindWindow() {
+    public void OpenFindWindow() {
       if (findWindow is null) {
         findWindow = new FindWindow(this, PagesTabControl, null, removeFindWindow);
         findWindow.Show();
@@ -149,7 +155,7 @@ namespace PdfFilesTextBrowser {
 
 
     private void findButton_Click(object sender, RoutedEventArgs e) {
-      openFindWindow();
+      OpenFindWindow();
     }
 
 

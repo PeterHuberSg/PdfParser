@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\CustomControlBaseLib\CustomControlBaseLib\CustomControlBaseLib.csproj" />
     <ProjectReference Include="..\PdfParser\PdfParser.csproj" />
+    <ProjectReference Include="..\TextStoreLib\TextStoreLib.csproj" />
   </ItemGroup>
 
   <ItemGroup>

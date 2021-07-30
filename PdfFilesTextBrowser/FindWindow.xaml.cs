@@ -51,7 +51,7 @@ namespace PdfFilesTextBrowser {
           TextTextbox.Text = searchedTextBox.SelectedText;
         } else if (selectedTabItem is TextViewer isTextViewer) {
           searchedTextViewer = isTextViewer;
-
+          TextTextbox.Text = isTextViewer.TextViewerSelection.Selection?.GetAllCharacters().ToString();
         } else if (selectedTabItem is RichTextBox isRichTextBox) {
           searchedRichTextBox = isRichTextBox;
           TextTextbox.Text = searchedRichTextBox.Selection.Text;
@@ -76,8 +76,12 @@ namespace PdfFilesTextBrowser {
 
     private void findWindow_PreviewKeyUp(object sender, KeyEventArgs e) {
       if (e.Key==Key.Return) {
-        FindNext();
-        e.Handled = true;
+        if (e.OriginalSource!=NextButton && e.OriginalSource!=PreviousButton) {
+          FindNext();
+          e.Handled = true;
+        }
+      } else if (e.Key==Key.Escape) {
+        Close();
       }
     }
 
@@ -107,6 +111,8 @@ namespace PdfFilesTextBrowser {
       var stringComparison =
           IgnoreCaseCheckBox.IsChecked!.Value ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
       if (searchedTextBox is not null) {
+        if (TextTextbox.Text.Length==0) return;
+
         var actualPosition = searchedTextBox.SelectionStart + 1;
         actualPosition = searchedTextBox.Text.IndexOf(TextTextbox.Text, actualPosition, stringComparison);
         if (actualPosition<0) {
@@ -189,6 +195,8 @@ namespace PdfFilesTextBrowser {
       var stringComparison =
         IgnoreCaseCheckBox.IsChecked!.Value ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
       if (searchedTextBox!=null) {
+        if (TextTextbox.Text.Length==0) return;
+
         var actualPosition = searchedTextBox.SelectionStart -1;
         if (actualPosition>=0) {
           actualPosition = searchedTextBox.Text.LastIndexOf(TextTextbox.Text, actualPosition, stringComparison);
@@ -202,6 +210,9 @@ namespace PdfFilesTextBrowser {
         }
         searchedTextBox.Focus();
         searchedTextBox.Select(actualPosition, TextTextbox.Text.Length);
+
+      } else if (searchedTextViewer is not null) {
+        searchedTextViewer.Search(TextTextbox.Text, isForward: false, IgnoreCaseCheckBox.IsChecked!.Value);
 
       } else {
         TextPointer endTextPointer;

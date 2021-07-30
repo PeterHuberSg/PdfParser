@@ -16,6 +16,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{755A0700-F8DD-4BD4-9449-4C2FCB6F35DA}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
+		.editorconfig.inferred = .editorconfig.inferred
 		CopyRight.MD = CopyRight.MD
 		PdfParser Design.docx = PdfParser Design.docx
 		PdfParser Design.pptx = PdfParser Design.pptx
@@ -23,6 +24,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CustomControlBaseLib", "..\CustomControlBaseLib\CustomControlBaseLib\CustomControlBaseLib.csproj", "{F021A1C5-6A88-452C-BD34-F421B143DF78}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TextStoreLib", "TextStoreLib\TextStoreLib.csproj", "{BCAFE822-1FA5-4DCE-9E0D-B722FF240FF8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextStoreLibTest", "TextStoreLibTest\TextStoreLibTest.csproj", "{F2153872-4290-4942-B94D-5BBE0EB2403F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -54,6 +59,14 @@ Global
 		{F021A1C5-6A88-452C-BD34-F421B143DF78}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F021A1C5-6A88-452C-BD34-F421B143DF78}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F021A1C5-6A88-452C-BD34-F421B143DF78}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BCAFE822-1FA5-4DCE-9E0D-B722FF240FF8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BCAFE822-1FA5-4DCE-9E0D-B722FF240FF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BCAFE822-1FA5-4DCE-9E0D-B722FF240FF8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BCAFE822-1FA5-4DCE-9E0D-B722FF240FF8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2153872-4290-4942-B94D-5BBE0EB2403F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2153872-4290-4942-B94D-5BBE0EB2403F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2153872-4290-4942-B94D-5BBE0EB2403F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2153872-4290-4942-B94D-5BBE0EB2403F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
