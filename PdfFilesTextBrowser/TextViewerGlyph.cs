@@ -79,7 +79,7 @@ namespace PdfFilesTextBrowser {
 
 
     /// <summary>
-    /// Contains the measurement information of one particular font and the specified font properties
+    /// Contains the measurement information of normal font and (not bold)
     /// </summary>
     public GlyphTypeface GlyphTypefaceNormal {
       get { return glyphTypefaceNormal; }
@@ -88,7 +88,7 @@ namespace PdfFilesTextBrowser {
 
 
     /// <summary>
-    /// Contains the measurement information of one particular font and the specified font properties
+    /// Contains the measurement information of bold font
     /// </summary>
     public GlyphTypeface GlyphTypefaceBold {
       get { return glyphTypefaceBold; }
@@ -100,6 +100,12 @@ namespace PdfFilesTextBrowser {
     /// Screen resolution. 
     /// </summary>
     public float PixelsPerDip { get; private set; }
+
+
+    /// <summary>
+    /// offset from left border before first character gets written
+    /// </summary>
+    public const int BorderX = 3;
     #endregion
 
 
@@ -107,14 +113,12 @@ namespace PdfFilesTextBrowser {
     //      -----------
 
     readonly TextViewer textViewer;
-    readonly Action isRendered;
     readonly Action maxLineWidthChanged;
 
 
-    public TextViewerGlyph(TextViewer textViewer, Action isRendered, Action maxLineWidthChanged) 
+    public TextViewerGlyph(TextViewer textViewer, Action maxLineWidthChanged) 
     {
       this.textViewer = textViewer;
-      this.isRendered = isRendered;
       this.maxLineWidthChanged = maxLineWidthChanged;
     }
     #endregion
@@ -125,6 +129,8 @@ namespace PdfFilesTextBrowser {
 
     public void Reset() {
       DisplayLines = null;
+      MaxLineWidth = 0;
+      XOffset = 0;
       MaxLineWidth = 0;
     }
 
@@ -150,9 +156,9 @@ namespace PdfFilesTextBrowser {
     }
 
 
-    public void ResetMaxLineWidth() {
-      MaxLineWidth = 0;
-    }
+    //public void ResetMaxLineWidth() {
+    //  MaxLineWidth = 0;
+    //}
 
 
     TextViewerAnchor? markAnchor;
@@ -248,7 +254,7 @@ namespace PdfFilesTextBrowser {
         $"lastDisplayedAbsoluteLineIndex: {lastDisplayedAbsoluteLineIndex}; XOffset: {XOffset:F0}");
       var hasMaxLineWidthChanged = false;
       for (int displayedAbsoluteLineIndex = DisplayLines.StartAbsoluteLine; displayedAbsoluteLineIndex < lastDisplayedAbsoluteLineIndex; displayedAbsoluteLineIndex++) {
-        var lineWidth = writeLine(drawingContext, new Point(3, lineOffset), FontSize, displayedAbsoluteLineIndex);
+        var lineWidth = writeLine(drawingContext, new Point(BorderX, lineOffset), FontSize, displayedAbsoluteLineIndex);
         lineOffset += FontSize;
         if (MaxLineWidth<lineWidth) {
           MaxLineWidth = lineWidth;
@@ -397,6 +403,17 @@ namespace PdfFilesTextBrowser {
                 isLineStartFound, xOffset, drawingContext);
               glyphTypeface = glyphTypefaceBold;
               brush = Brushes.Green;
+              isUnderline = true;
+              break;
+
+            case 'u':
+              isUnFormatted = false;
+              displayedGlyphWidths.Add(0);
+              codePoint = int.MinValue;
+              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin,
+                isLineStartFound, xOffset, drawingContext);
+              glyphTypeface = glyphTypefaceNormal;
+              brush = Brushes.Black;
               isUnderline = true;
               break;
 
@@ -594,7 +611,6 @@ namespace PdfFilesTextBrowser {
       glyphRunGlyphWidths.Clear();
       origin = new Point(origin.X + glyphRunWidth, origin.Y);
       glyphRunWidth = 0;
-      isRendered();
     }
     #endregion
   }

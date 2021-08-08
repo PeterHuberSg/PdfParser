@@ -63,8 +63,6 @@ namespace PdfFilesTextBrowser {
     private void ZoomButton_Loaded(object sender, System.Windows.RoutedEventArgs e) {
       HorizontalAlignment = HorizontalAlignment.Stretch;
       VerticalAlignment = VerticalAlignment.Stretch;
-      Height = 20;
-      Width = 20;
       FontSize = 12;
       zoomButtonGraph = new ZoomButtonGraph(isZoomInEnabled, isZoomOutEnabled);
       Content = zoomButtonGraph;
