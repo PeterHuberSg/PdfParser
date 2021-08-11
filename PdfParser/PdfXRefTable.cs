@@ -86,6 +86,11 @@ namespace PdfParserLib {
       if (token is RefToken refToken) {
         throw new Exception($"RefTokens should not get added to PdfXRefTable: '{token}'.");
       }
+      if (tokens.TryGetValue(token.ObjectId!.Value, out var storedToken)) {
+        if (storedToken is NullToken) {
+          tokens.Remove(token.ObjectId!.Value);
+        }
+      }
       tokens.Add(token.ObjectId!.Value, token);
     }
 

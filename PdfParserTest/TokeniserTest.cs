@@ -121,6 +121,7 @@ namespace PdfParserTest {
         testStringuffer[i] = (byte)testString[i];
       }
       var tokeniser=new Tokeniser(testStringuffer);
+      tokeniser.CreateEmptyXrefTableForUnitTest();
       foreach (var expectedString in expectedStrings) {
         Assert.AreEqual(expectedString, tokeniser.GetNextToken().ToString());
       }

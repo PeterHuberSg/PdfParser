@@ -31,7 +31,7 @@ namespace PdfParserLib {
 
 
     // >>>>>>>>>>>>>>>>>>>>>>>>>start code copied from CodeGenerator<<<<<<<<<<<<<<<<<<<<<<<<<
-    public static Dictionary<string, char> Chars  = new Dictionary<string, char>() {
+    public static Dictionary<string, char> Chars = new Dictionary<string, char>() {
         {"A",'A' },
         {"AE",'Æ' },
         {"Aacute",'Á' },
@@ -263,6 +263,7 @@ namespace PdfParserLib {
         {"f_i",'ﬁ' },
         {"f_f",'ﬀ' },
         {"T_h",'ᵺ' },
+        {"blank",' ' },
         {"AEsmall",'æ' },
         {"Aacutesmall",'á' },
         {"Acircumflexsmall",'â' },

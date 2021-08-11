@@ -141,7 +141,7 @@ namespace PdfFilesTextBrowser {
         DisplayLines.LinesCount!=displayLines.LinesCount) 
       {
         DisplayLines = displayLines;
-        textViewer.LogLine($"Glyph.SetDisplayLines {DisplayLines}");
+        //textViewer.LogLine($"Glyph.SetDisplayLines {DisplayLines}");
         InvalidateVisual();
       }
     }
@@ -150,7 +150,7 @@ namespace PdfFilesTextBrowser {
     public void SetXOffset(double xOffset) {
       if (XOffset!=xOffset) {
         XOffset = xOffset;
-        textViewer.LogLine($"Glyph.SetXOffset {xOffset:F0}");
+        //textViewer.LogLine($"Glyph.SetXOffset {xOffset:F0}");
         InvalidateVisual();
       }
     }
@@ -250,8 +250,8 @@ namespace PdfFilesTextBrowser {
       displayedGlyphWidths.Clear();
       var lineOffset = FontSize;
       var lastDisplayedAbsoluteLineIndex = Math.Min(DisplayLines.EndAbsoluteLine, textViewer.TextStore.LinesCount);
-      textViewer.LogLine1($"Glyph.OnRenderContent DisplayLines: '{DisplayLines}'; " +
-        $"lastDisplayedAbsoluteLineIndex: {lastDisplayedAbsoluteLineIndex}; XOffset: {XOffset:F0}");
+      //textViewer.LogLine1($"Glyph.OnRenderContent DisplayLines: '{DisplayLines}'; " +
+      //  $"lastDisplayedAbsoluteLineIndex: {lastDisplayedAbsoluteLineIndex}; XOffset: {XOffset:F0}");
       var hasMaxLineWidthChanged = false;
       for (int displayedAbsoluteLineIndex = DisplayLines.StartAbsoluteLine; displayedAbsoluteLineIndex < lastDisplayedAbsoluteLineIndex; displayedAbsoluteLineIndex++) {
         var lineWidth = writeLine(drawingContext, new Point(BorderX, lineOffset), FontSize, displayedAbsoluteLineIndex);
@@ -266,7 +266,7 @@ namespace PdfFilesTextBrowser {
         maxLineWidthChanged();
       }
       textViewer.TextViewerSelection.SetDisplayRegion(DisplayLines, XOffset);
-      textViewer.LogLine("Glyph => textViewer.UpdateMouseCursorAndSelection()");
+      //textViewer.LogLine("Glyph => textViewer.UpdateMouseCursorAndSelection()");
       textViewer.UpdateMouseCursorAndSelection();
     }
 
@@ -282,7 +282,10 @@ namespace PdfFilesTextBrowser {
     /// </summary>
     private double writeLine(DrawingContext drawingContext, Point origin, double fontSize, int displayedAbsoluteLineIndex) {
       ReadOnlySpan<char> text = textViewer.TextStore[displayedAbsoluteLineIndex];
-      if (text.Length==0) return 0;
+      if (text.Length==0) {
+        displayedGlyphWidths.Add(0);//for CR for empty line
+        return 0;
+      }
 
       var isUnFormatted = true;
       var isAnchor = false;
@@ -469,8 +472,8 @@ namespace PdfFilesTextBrowser {
                 var name = stringBuilder.ToString();
                 if (textViewer.Anchors.TryGetValue(name, out var anchor)) {
                   if (anchor==markAnchor) {
-                    drawingContext.DrawRectangle(Brushes.LightBlue, null,
-                      new Rect(origin.X, origin.Y - fontSize + 3, glyphRunWidth, fontSize));
+                    drawingContext.DrawRectangle(Brushes.LightGreen, null,
+                      new Rect(origin.X, origin.Y - fontSize + textViewer.TextViewerSelection.GlyphYOffset, glyphRunWidth, fontSize));
                   }
                 }
 

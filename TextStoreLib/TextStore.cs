@@ -342,6 +342,12 @@ namespace PdfParserLib {
     //}
 
 
+    public string GetChar(int charsIndex) {
+      var c = Chars[charsIndex];
+      return c=='\r' ? "cr" : c.ToString();
+    }
+
+
     public string GetString(int startLine, int startChar, int endChar) {
       if (startLine<0 || startLine>=linesCount) return "";
 

@@ -1549,6 +1549,7 @@ a9;2720";
       sb.AppendLine($"        {{\"f_i\",'ﬁ' }},"); //PDF32000_2008.pdf
       sb.AppendLine($"        {{\"f_f\",'ﬀ' }},"); //PDF32000_2008.pdf
       sb.AppendLine($"        {{\"T_h\",'ᵺ' }},"); //PDF32000_2008.pdf
+      sb.AppendLine($"        {{\"blank\",' ' }},"); 
 
       //d4_MacExpertEncodingCharacterSet
       lines = d4_MacExpertEncodingCharacterSet.Split(Environment.NewLine);
@@ -1644,7 +1645,7 @@ a9;2720";
       }
       var code = sb.ToString();
 
-      //copy code string to PdfParserLib, PdfEncoding.cs
+      //copy code string to PdfParser.PdfEncoding.cs
       System.Diagnostics.Debugger.Break();
     }
 

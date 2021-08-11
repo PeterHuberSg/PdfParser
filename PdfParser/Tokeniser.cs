@@ -329,6 +329,11 @@ namespace PdfParserLib {
     PdfXRefTable pdfXRefTable;
 
 
+    public void CreateEmptyXrefTableForUnitTest() {
+      pdfXRefTable = new PdfXRefTable(this);
+    }
+
+
     private void readXrefTable() {
       try {
         //read xref table

@@ -19,7 +19,14 @@ namespace PdfFilesTextBrowser {
     public TextStoreSelection? Selection { get; private set; }
 
 
+    /// <summary>
+    /// vertical pixel offset from start of font to start of displayed selection rectangle 
+    /// </summary>
+    public double GlyphYOffset;
+
+
     public readonly TextViewer TextViewer;
+    public readonly TextStore TextStore;
     private readonly IReadOnlyList<double> displayedGlyphWidths;
 
     #endregion
@@ -30,6 +37,7 @@ namespace PdfFilesTextBrowser {
 
     public TextViewerSelection(TextViewer textViewer) {
       TextViewer = textViewer;
+      TextStore = TextViewer.TextStore;
       displayedGlyphWidths = textViewer.DisplayedGlyphWidths;
     }
     #endregion
@@ -56,7 +64,7 @@ namespace PdfFilesTextBrowser {
       {
         this.displayLines = displayLines;
         this.xDisplayOffset = xDisplayOffset;
-        TextViewer.LogLine($"Selection.SetDisplayRegion displayLines: '{displayLines}'; xDisplayOffset: {xDisplayOffset:F0}");
+//TextViewer.LogLine($"Selection.SetDisplayRegion displayLines: '{displayLines}'; xDisplayOffset: {xDisplayOffset:F0}");
         InvalidateVisual();
       }
     }
@@ -74,7 +82,7 @@ namespace PdfFilesTextBrowser {
           Selection.EndChar!=selection.EndChar)))
       {
         Selection = selection; 
-        TextViewer.LogLine($"Selection.SetSelection {Selection}");
+//TextViewer.LogLine($"Selection.SetSelection {Selection}");
         if (isImmediateRenderingNeeded) {
           InvalidateVisual();
         }
@@ -82,24 +90,35 @@ namespace PdfFilesTextBrowser {
     }
 
 
-    public int GetCharPosLeft(int absoluteLine, double x) {
-      var displayedGlyphWidthsStartDisplayLineOffset = TextViewer.TextStore.LineStarts[displayLines!.StartAbsoluteLine];
+    /// <summary>
+    /// Returns character index of first character mouse is over. absoluteLine gets correctged if mouse is outside the 
+    /// displayed text.
+    /// </summary>
+    public int GetCharPosLeft(ref int absoluteLine, double x) {
+      var displayedGlyphWidthsStartDisplayLineOffset = TextStore.LineStarts[displayLines!.StartAbsoluteLine];
+      if (absoluteLine>=TextStore.LinesCount) {
+        //position is outside of TextStore, i.e. mouse id over empty lines after all text is displayed
+        System.Diagnostics.Debugger.Break(); //this check is already performed by the callers, execution should never come here
+        absoluteLine = TextStore.LinesCount - 1;
+        return TextStore.LineStarts[TextStore.LinesCount]-TextStore.LineStarts[absoluteLine]-1;
+      }
+
       if (absoluteLine>displayLines.EndAbsoluteLine) {
         //position is outside of displayed lines
         absoluteLine = displayLines.EndAbsoluteLine;
       }
-      var displayedGlyphWidthsIndex = TextViewer.TextStore.LineStarts[absoluteLine++] - displayedGlyphWidthsStartDisplayLineOffset;
-      var nextLinefirstCharIndex = TextViewer.TextStore.LineStarts[absoluteLine] - displayedGlyphWidthsStartDisplayLineOffset;
+      var displayedGlyphWidthsIndex = TextStore.LineStarts[absoluteLine] - displayedGlyphWidthsStartDisplayLineOffset;
+      var nextLinefirstCharIndex = TextStore.LineStarts[absoluteLine+1] - displayedGlyphWidthsStartDisplayLineOffset;
       var width = 0.0;
       var charPos = -1;
       do {
         double charWidth;
         charWidth = displayedGlyphWidths[displayedGlyphWidthsIndex++];
+        charPos++;
         if (displayedGlyphWidthsIndex>=nextLinefirstCharIndex) {
           //end of line reached
           return charPos;
         }
-        charPos++;
         width += charWidth;
       } while (width<x);
       return charPos;
@@ -111,6 +130,7 @@ namespace PdfFilesTextBrowser {
       //      ---------------------------
 
     protected override Size MeasureContentOverride(Size constraint) {
+      GlyphYOffset = FontSize / 5;//set it already here in case TextViewerGlyph needs it
       return constraint;
     }
 
@@ -121,7 +141,6 @@ namespace PdfFilesTextBrowser {
 
 
     static readonly Pen selectionPen = new Pen(Brushes.LightBlue, 1);
-    double glyphYOffset;
 
 
 
@@ -130,21 +149,20 @@ namespace PdfFilesTextBrowser {
 
       if (Selection.StartLine<displayLines.EndAbsoluteLine && Selection.EndLine>=displayLines.StartAbsoluteLine) {
         //selection is within displayed lines
-        TextViewer.LogLine1($"Selection.OnRenderContent displayLines: {displayLines}; xDisplayOffset: {xDisplayOffset:F0}; " +
-          $"Selection: {Selection}");
+        //TextViewer.LogLine1($"Selection.OnRenderContent displayLines: {displayLines}; xDisplayOffset: {xDisplayOffset:F0}; " +
+          //$"Selection: {Selection}");
         ///////////////////////
         ////var sb = new StringBuilder();
         ////for (int charIndex = 0; charIndex<TextStore.CharsCount; charIndex++) {
         ////for (int charIndex = 0; charIndex<displayedGlyphWidths.Count; charIndex++) {
-        //var textStoreCharsIndex = TextViewer.TextStore.LineStarts[absoluteLine];
+        //var textStoreCharsIndex = TextStore.LineStarts[absoluteLine];
         //for (int charIndex = 0; charIndex<20; charIndex++) {
-        //  TextViewer.LogLine($"charIndex: {charIndex}, {TextViewer.TextStore.Chars[charIndex]}, {textStoreCharsIndex}, {displayedGlyphWidths[textStoreCharsIndex++]}");
-        //  //sb.AppendLine($"charIndex: {charIndex}, {TextViewer.TextStore.Chars[charIndex]}, {displayedGlyphWidths[charIndex]}");
+        //  TextViewer.LogLine($"charIndex: {charIndex}, {TextStore.Chars[charIndex]}, {textStoreCharsIndex}, {displayedGlyphWidths[textStoreCharsIndex++]}");
+        //  //sb.AppendLine($"charIndex: {charIndex}, {TextStore.Chars[charIndex]}, {displayedGlyphWidths[charIndex]}");
         //}
         ////var s = sb.ToString();
         ///////////////////////
 
-        glyphYOffset = FontSize / 5;
         //selection is visible in the TextViewer
         if (Selection.StartLine==Selection.EndLine) {
           //display only 1 line
@@ -172,12 +190,12 @@ namespace PdfFilesTextBrowser {
 
 
     private void drawSelectionLineFromStartCharToEnd(DrawingContext drawingContext, int absoluteLine, int startCharIndex) {
-      var y = (absoluteLine - displayLines!.StartAbsoluteLine) * FontSize + glyphYOffset;
+      var y = (absoluteLine - displayLines!.StartAbsoluteLine) * FontSize + GlyphYOffset;
       var x = TextViewerGlyph.BorderX - xDisplayOffset;
       var width = 0.0;
-      var displayedGlyphWidthsStartDisplayLineOffset = TextViewer.TextStore.LineStarts[displayLines.StartAbsoluteLine];
-      var displayedGlyphWidthsIndex = TextViewer.TextStore.LineStarts[absoluteLine++] - displayedGlyphWidthsStartDisplayLineOffset;
-      var nextLinefirstCharIndex = TextViewer.TextStore.LineStarts[absoluteLine] - displayedGlyphWidthsStartDisplayLineOffset;
+      var displayedGlyphWidthsStartDisplayLineOffset = TextStore.LineStarts[displayLines.StartAbsoluteLine];
+      var displayedGlyphWidthsIndex = TextStore.LineStarts[absoluteLine++] - displayedGlyphWidthsStartDisplayLineOffset;
+      var nextLinefirstCharIndex = TextStore.LineStarts[absoluteLine] - displayedGlyphWidthsStartDisplayLineOffset;
 
       //find x position of first selected character
       for (var charIndex = 0; charIndex<startCharIndex; charIndex++) {
@@ -203,12 +221,12 @@ namespace PdfFilesTextBrowser {
 
 
     private void drawSelectionLineFrom0ToEnd(DrawingContext drawingContext, int absoluteLine) {
-      var y = (absoluteLine - displayLines!.StartAbsoluteLine) * FontSize + glyphYOffset;
+      var y = (absoluteLine - displayLines!.StartAbsoluteLine) * FontSize + GlyphYOffset;
       var x = 0;
-      var width = 0.0;
-      var displayedGlyphWidthsStartDisplayLineOffset = TextViewer.TextStore.LineStarts[displayLines.StartAbsoluteLine];
-      var displayedGlyphWidthsIndex = TextViewer.TextStore.LineStarts[absoluteLine++] - displayedGlyphWidthsStartDisplayLineOffset;
-      var nextLinefirstCharIndex = TextViewer.TextStore.LineStarts[absoluteLine] - displayedGlyphWidthsStartDisplayLineOffset;
+      var width = -xDisplayOffset;
+      var displayedGlyphWidthsStartDisplayLineOffset = TextStore.LineStarts[displayLines.StartAbsoluteLine];
+      var displayedGlyphWidthsIndex = TextStore.LineStarts[absoluteLine++] - displayedGlyphWidthsStartDisplayLineOffset;
+      var nextLinefirstCharIndex = TextStore.LineStarts[absoluteLine] - displayedGlyphWidthsStartDisplayLineOffset;
 
       //measure width of all characters on this line
       while (displayedGlyphWidthsIndex<nextLinefirstCharIndex) {
@@ -219,17 +237,19 @@ namespace PdfFilesTextBrowser {
         }
         width += charWidth;
       }
-      drawingContext.DrawRectangle(Brushes.LightBlue, selectionPen, new Rect(x, y, width - xDisplayOffset, FontSize));
+      if (width>0) {
+        drawingContext.DrawRectangle(Brushes.LightBlue, selectionPen, new Rect(x, y, width, FontSize));
+      }
     }
 
 
     private void drawSelectionLineFrom0ToEndChar(DrawingContext drawingContext, int absoluteLine, int endCharIndex) {
-      var y = (absoluteLine - displayLines!.StartAbsoluteLine) * FontSize + glyphYOffset;
+      var y = (absoluteLine - displayLines!.StartAbsoluteLine) * FontSize + GlyphYOffset;
       var x = 0;
-      var width = 0.0;
-      var displayedGlyphWidthsStartDisplayLineOffset = TextViewer.TextStore.LineStarts[displayLines.StartAbsoluteLine];
-      var displayedGlyphWidthsIndex = TextViewer.TextStore.LineStarts[absoluteLine++] - displayedGlyphWidthsStartDisplayLineOffset;
-      var nextLinefirstCharIndex = TextViewer.TextStore.LineStarts[absoluteLine] - displayedGlyphWidthsStartDisplayLineOffset;
+      var width = -xDisplayOffset;
+      var displayedGlyphWidthsStartDisplayLineOffset = TextStore.LineStarts[displayLines.StartAbsoluteLine];
+      var displayedGlyphWidthsIndex = TextStore.LineStarts[absoluteLine++] - displayedGlyphWidthsStartDisplayLineOffset;
+      var nextLinefirstCharIndex = TextStore.LineStarts[absoluteLine] - displayedGlyphWidthsStartDisplayLineOffset;
 
       //measure width of all selected characters
       for (var charIndex = 0; charIndex<=endCharIndex; charIndex++) {
@@ -241,7 +261,9 @@ namespace PdfFilesTextBrowser {
         }
         width += charWidth;
       }
-      drawingContext.DrawRectangle(Brushes.LightBlue, selectionPen, new Rect(x, y, width - xDisplayOffset, FontSize));
+      if (width>0) {
+        drawingContext.DrawRectangle(Brushes.LightBlue, selectionPen, new Rect(x, y, width, FontSize));
+      }
     }
 
 
@@ -249,18 +271,22 @@ namespace PdfFilesTextBrowser {
       int endCharIndex) 
     {
       var charsCount = endCharIndex - startCharIndex + 1;
-      var y = (absoluteLine - displayLines!.StartAbsoluteLine) * FontSize + glyphYOffset;
+      if (charsCount==1 && TextStore.Chars[TextStore.LineStarts[absoluteLine]]=='\r') {
+        //empty line
+        return;
+      }
+      var y = (absoluteLine - displayLines!.StartAbsoluteLine) * FontSize + GlyphYOffset;
       var x = TextViewerGlyph.BorderX - xDisplayOffset;
       var width = 0.0;
-      var displayedGlyphWidthsStartDisplayLineOffset = TextViewer.TextStore.LineStarts[displayLines.StartAbsoluteLine];
-      var displayedGlyphWidthsIndex = TextViewer.TextStore.LineStarts[absoluteLine++] - displayedGlyphWidthsStartDisplayLineOffset;
-      var nextLinefirstCharIndex = TextViewer.TextStore.LineStarts[absoluteLine] - displayedGlyphWidthsStartDisplayLineOffset;
+      var displayedGlyphWidthsStartDisplayLineOffset = TextStore.LineStarts[displayLines.StartAbsoluteLine];
+      var displayedGlyphWidthsIndex = TextStore.LineStarts[absoluteLine++] - displayedGlyphWidthsStartDisplayLineOffset;
+      var nextLinefirstCharIndex = TextStore.LineStarts[absoluteLine] - displayedGlyphWidthsStartDisplayLineOffset;
 
       //find x position of first character
       for (var charIndex = 0; charIndex<startCharIndex; charIndex++) {
         double charWidth;
-TextViewer.LogLine($"charIndex: {charIndex}; char: {TextViewer.TextStore.Chars[displayedGlyphWidthsIndex+displayedGlyphWidthsStartDisplayLineOffset]}");
-TextViewer.LogLine($"displayedGlyphWidthsIndex: {displayedGlyphWidthsIndex}; charWidth: {displayedGlyphWidths[displayedGlyphWidthsIndex]:F0}");
+//TextViewer.LogLine($"charIndex: {charIndex}; char: {TextStore.GetChar(displayedGlyphWidthsIndex+displayedGlyphWidthsStartDisplayLineOffset)}; " +
+//$"displayedGlyphWidthsIndex: {displayedGlyphWidthsIndex}; charWidth: {displayedGlyphWidths[displayedGlyphWidthsIndex]:F0}");
         charWidth = displayedGlyphWidths[displayedGlyphWidthsIndex++];
         if (displayedGlyphWidthsIndex>=nextLinefirstCharIndex) {
           System.Diagnostics.Debugger.Break();
@@ -268,20 +294,23 @@ TextViewer.LogLine($"displayedGlyphWidthsIndex: {displayedGlyphWidthsIndex}; cha
         }
         x += charWidth;
       }
-TextViewer.LogLine($"x: {x:F0}");
+//TextViewer.LogLine($"x: {x:F0}");
       //measure width of all selected characters
       for (var charIndex = 0; charIndex < charsCount; charIndex++) {
-TextViewer.LogLine($"charIndex: {charIndex}; char: {TextViewer.TextStore.Chars[displayedGlyphWidthsIndex+displayedGlyphWidthsStartDisplayLineOffset]}");
-TextViewer.LogLine($"displayedGlyphWidthsIndex: {displayedGlyphWidthsIndex}; charWidth: {displayedGlyphWidths[displayedGlyphWidthsIndex]:F0}");
+//TextViewer.LogLine($"charIndex: {charIndex}; char: {TextStore.GetChar(displayedGlyphWidthsIndex+displayedGlyphWidthsStartDisplayLineOffset)}; " +
+//$"displayedGlyphWidthsIndex: {displayedGlyphWidthsIndex}; charWidth: {displayedGlyphWidths[displayedGlyphWidthsIndex]:F0}");
         double charWidth;
         charWidth = displayedGlyphWidths[displayedGlyphWidthsIndex++];
         if (displayedGlyphWidthsIndex>=nextLinefirstCharIndex) {
-          System.Diagnostics.Debugger.Break();
+          if (charWidth>0) {
+            //character is not carriage return.
+            System.Diagnostics.Debugger.Break();
+          }
           break;
         }
         width += charWidth;
       }
-      TextViewer.LogLine($"x: {x}; y: {y}; width: {width}; FontSize: {FontSize}; ");
+//TextViewer.LogLine($"x: {x}; y: {y}; width: {width}; FontSize: {FontSize}; ");
       drawingContext.DrawRectangle(Brushes.LightBlue, selectionPen, new Rect(x, y, width, FontSize));
 
     }
