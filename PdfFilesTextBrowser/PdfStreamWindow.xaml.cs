@@ -36,6 +36,8 @@ namespace PdfFilesTextBrowser {
       ObjectId = objectId;
       this.textViewer = textViewer;
       Owner = textViewer.OwnerWindow;
+      MainWindow.Current!.Register(this);
+
       Width = Owner.ActualWidth/2;
       Height = Owner.ActualHeight * 0.9;
       //var location = Owner.PointToScreen(new Point(Owner.Width*0, Owner.Height*0));
@@ -69,7 +71,7 @@ namespace PdfFilesTextBrowser {
     }
 
 
-    ReadOnlyMemory<byte> bytesMemory;
+    ReadOnlyMemory<byte>? bytesMemory;
 
 
     private void displayContent() {
@@ -89,6 +91,17 @@ namespace PdfFilesTextBrowser {
 
         DictionaryToken? dictionaryToken;
         (dictionaryToken, bytesMemory) = tokenStreamNullable.Value;
+        if (bytesMemory is null) {
+          if (dictionaryToken is null) {
+            StreamTextBox.Text = $"cannot find stream content of {ObjectId}.";
+          } else {
+            StreamTextBox.Text =
+              dictionaryToken.ObjectId.ToString() + Environment.NewLine +
+              dictionaryToken.ToString() + Environment.NewLine +
+              dictionaryToken.StreamLengthProblem;
+          }
+          return;
+        }
         MainStatusBar.IsEnabled = true;
         if (dictionaryToken!=null) {
           if (dictionaryToken.PdfObject is PdfContent) {
@@ -103,7 +116,7 @@ namespace PdfFilesTextBrowser {
         displayChar(isInitialising: true);
       } catch (Exception ex) {
         MainStatusBar.IsEnabled = false;
-        StreamTextBox.Text = "Can not display stream content because of exception: " + ex.Message;
+        StreamTextBox.Text = "Can not display stream content because of exception: " + Environment.NewLine + ex.ToDetailString();
       }
     }
 
@@ -112,7 +125,7 @@ namespace PdfFilesTextBrowser {
     //      --------
 
     private void displayChar(bool isInitialising) {
-      var bytes = bytesMemory.Span;
+      var bytes = bytesMemory!.Value.Span;
       sb.Clear();
       var charCount = 0;
       var hexCount = 0;
@@ -146,7 +159,7 @@ namespace PdfFilesTextBrowser {
 
 
     private void displayHex() {
-      var bytes = bytesMemory.Span;
+      var bytes = bytesMemory!.Value.Span;
       StreamTextBox.FontFamily = courierNewFontFamily;
       HexRadioButton.IsChecked = true;
       sb.Clear();
@@ -187,7 +200,7 @@ namespace PdfFilesTextBrowser {
 
     private void displayContentStream(DictionaryToken contentDictionaryToken) {
       var fonts = ((PdfContent)contentDictionaryToken.PdfObject!).Fonts;
-      var bytes = bytesMemory.Span;
+      var bytes = bytesMemory!.Value.Span;
 
       //check how many cr and lf are in the first chunk of characters. If there are none, the Content is in a object stream and
       //EOLs should get added to improve readability
@@ -374,7 +387,7 @@ namespace PdfFilesTextBrowser {
     //      -------------
 
     private void displayOjectStream(DictionaryToken dictionaryToken) {
-      var bytes = bytesMemory.Span;
+      var bytes = bytesMemory!.Value.Span;
       sb.Clear();
       var objectCount = ((NumberToken)dictionaryToken["N"]).Integer!.Value;
       var first = ((NumberToken)dictionaryToken["First"]).Integer!.Value;
@@ -465,6 +478,7 @@ namespace PdfFilesTextBrowser {
 
     private void pdfStreamWindow_Closed(object? sender, EventArgs e) {
       textViewer.ResetStreamWindow();
+      MainWindow.Current!.Unregister(this);
       Owner.Activate();
     }
   }

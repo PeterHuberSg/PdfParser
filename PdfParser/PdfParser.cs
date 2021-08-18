@@ -19,6 +19,7 @@ http://creativecommons.org/publicdomain/zero/1.0
 This software is distributed without any warranty. 
 **************************************************************************************/
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -95,10 +96,13 @@ namespace PdfParserLib {
       byte[]? streamBuffer = null, 
       StringBuilder? stringBuilder = null) 
     {
-
+      System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+        $"PdfParser constructor start");
       tokeniser = new Tokeniser(pdfBytes, password, contentDelimiter, streamBuffer, stringBuilder);
       tokeniser.VerifyFileHeader();
       tokeniser.FindPages();
+      System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+        $"PdfParser constructor completed");
     }
     #endregion
 

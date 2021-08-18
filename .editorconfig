@@ -2,3 +2,9 @@
 
 # CA5351: Do Not Use Broken Cryptographic Algorithms
 dotnet_diagnostic.CA5351.severity = none
+
+# IDE0040: Add accessibility modifiers
+dotnet_style_require_accessibility_modifiers = never
+
+# IDE0058: Expression value is never used
+csharp_style_unused_value_expression_statement_preference = unused_local_variable

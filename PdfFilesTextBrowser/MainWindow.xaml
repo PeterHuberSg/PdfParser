@@ -18,12 +18,12 @@
       <ColumnDefinition/>
     </Grid.ColumnDefinitions>
 
-    <Rectangle Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Grid.ColumnSpan="2" Fill="Gainsboro"/>
+    <Rectangle Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Grid.ColumnSpan="2" Fill="#FFF1EDED"/>
     <Button Grid.Row="0" Grid.Column="0" x:Name="DirectoryButton" Content="_Directory" Margin="4,4,4,2"/>
-    <TextBox Grid.Row="0" Grid.Column="1" x:Name="DirectoryTextBox" VerticalAlignment="Center"/>
+    <TextBox Grid.Row="0" Grid.Column="1" x:Name="DirectoryTextBox" VerticalAlignment="Center" IsReadOnly="true" Margin="4,4,4,2"/>
 
     <Button Grid.Row="1" Grid.Column="0" x:Name="FileButton" Content="_File" Margin="4,2,4,4"/>
-    <TextBox Grid.Row="1" Grid.Column="1" x:Name="FileTextBox" VerticalAlignment="Center"/>
+    <TextBox Grid.Row="1" Grid.Column="1" x:Name="FileTextBox" VerticalAlignment="Center" IsReadOnly="true" Margin="4,2,4,4"/>
 
     <Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2">
       <Grid.ColumnDefinitions>
@@ -47,6 +47,7 @@
     </Grid>
 
     <StatusBar Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" >
+      <StatusBarItem Content="File Navigation:"/>
       <StatusBarItem>
         <Button x:Name="PreviousButton" Content="_Prev"/>
       </StatusBarItem>
@@ -54,6 +55,7 @@
         <Button x:Name="NextButton" Content="_Next"/>
       </StatusBarItem>
       <Separator/>
+      <StatusBarItem Content="Search:"/>
       <StatusBarItem>
         <Button x:Name="FindButton" Content="_Find ^f"/>
       </StatusBarItem>

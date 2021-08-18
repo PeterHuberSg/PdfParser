@@ -17,7 +17,7 @@ using System.Windows.Shapes;
 using Microsoft.Win32;
 using PdfParserLib;
 using Ookii.Dialogs;
-
+using System.Threading;
 
 namespace PdfFilesTextBrowser {
 
@@ -27,6 +27,19 @@ namespace PdfFilesTextBrowser {
   /// </summary>
   public partial class MainWindow: Window {
 
+    #region Properties
+    //      ----------
+
+    /// <summary>
+    /// Currently running MainWindow
+    /// </summary>
+    public static MainWindow? Current;
+    #endregion
+
+
+    #region Constructor
+    //      -----------
+
     readonly TextViewer bytesTextViwer;
     //readonly Stack<PdfSourceRichTextBox.PdfRefRun> pdfRefRunTrace;
     const int maxPages = 20;
@@ -35,10 +48,11 @@ namespace PdfFilesTextBrowser {
     public MainWindow() {
       //pdfRefRunTrace = new Stack<PdfSourceRichTextBox.PdfRefRun>();
       InitializeComponent();
+
+      Current = this;
       bytesTextViwer = new(this);
 
-      MainPdfViewer.MaxPages = maxPages;
-
+      //DirectoryTextBox.Text = @"D:\";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\Invest\CS";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\Invest\DBS";
@@ -55,14 +69,15 @@ namespace PdfFilesTextBrowser {
       //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\AHV\AnmeldungAHV2019.pdf";
       //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\BDSM\climbing_hitches.pdf";
       //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\AHV\AnmeldungAHV2019.pdf";
-      FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202004.pdf";
+      //FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202004.pdf";
       //FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202104.pdf";
       //FileTextBox.Text = @"D:\PDF32000_2008.pdf";
+      FileTextBox.Text = @"D:\Abmelung Horgen.pdf";
 
       //xref stream
 
       if (DirectoryTextBox.Text.Length>0 || FileTextBox.Text.Length>0) {
-        nextButton_Click(NextButton, new RoutedEventArgs());
+        navigate(isNext: true);
       }
 
       KeyUp += mainWindow_KeyUp;
@@ -72,8 +87,37 @@ namespace PdfFilesTextBrowser {
       NextButton.Click += nextButton_Click;
       FindButton.Click += findButton_Click;
       BackButton.Click += backButton_Click;
+      PagesTabControl.SelectionChanged += PagesTabControl_SelectionChanged;
+    }
+    #endregion
+
+
+    #region Child Windows
+    //      -------------
+
+    readonly HashSet<Window> registeredWindows = new HashSet<Window>();
+
+
+    public void Register(Window window) {
+      registeredWindows.Add(window);
     }
 
+
+    public void Unregister(Window window) {
+      registeredWindows.Remove(window);
+    }
+
+
+    private void closeRegisteredWindows() {
+      foreach (var window in registeredWindows.ToArray()) {//have to loop over copy, because windows will remove themselves
+        window.Close();
+      }
+    }
+    #endregion
+
+
+    #region File Navigation
+    //      ---------------
 
     private void directoryButton_Click(object sender, RoutedEventArgs e) {
       var openFolderDialog = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog();
@@ -106,6 +150,20 @@ namespace PdfFilesTextBrowser {
       }
     }
 
+
+    private void nextButton_Click(object sender, RoutedEventArgs e) {
+      navigate(isNext: true);
+    }
+
+
+    private void previousButton_Click(object sender, RoutedEventArgs e) {
+      navigate(isNext: false);
+    }
+    #endregion
+
+
+    #region Keystrokes and FindWindow
+    //      -------------------------
 
     FindWindow? findWindow;
 
@@ -157,7 +215,11 @@ namespace PdfFilesTextBrowser {
     private void findButton_Click(object sender, RoutedEventArgs e) {
       OpenFindWindow();
     }
+    #endregion
 
+
+    #region BackButton
+    //      ----------
 
     //internal void AddToTrace(PdfSourceRichTextBox.PdfRefRun pdfRefRun) {
     //  if (pdfRefRunTrace.Count==0) {
@@ -167,6 +229,7 @@ namespace PdfFilesTextBrowser {
     //}
 
 
+    //Todo: Add Back Button functionality
     private void backButton_Click(object sender, RoutedEventArgs e) {
       //var pdfObjectRun = pdfRefRunTrace.Pop()!;
       //pdfObjectRun.SetFocus();
@@ -186,19 +249,135 @@ namespace PdfFilesTextBrowser {
     readonly List<FileInfo> allFiles = new List<FileInfo>();
     int currentFileIndex;
     bool isShowStartFile;
+    #endregion
 
 
-    private void nextButton_Click(object sender, RoutedEventArgs e) {
-      navigate(isNext: true);
+    #region Page Controller
+    //      ---------------
+
+    PdfParser? pdfParser;
+    TabItem? pageControllerTabItem;
+    int pageNo;
+    TextBox? pageNoTextBox;
+    Button? endButton;
+
+
+    private TabItem createPageControllerTabItem() {
+      var tabItemStackPanel = new StackPanel { Orientation=Orientation.Horizontal };
+
+      var labelTextBlock = new TextBlock { Text="Page:" };
+      tabItemStackPanel.Children.Add(labelTextBlock);
+
+      var zeroButton = new Button { Content = "0", MinWidth=FontSize*1.5 };
+      zeroButton.Click += ZeroButton_Click;
+      tabItemStackPanel.Children.Add(zeroButton);
+
+      var minus2Button = new Button { Content = "--", MinWidth=FontSize*1.5 };
+      minus2Button.Click += Minus2Button_Click;
+      tabItemStackPanel.Children.Add(minus2Button);
+
+      var minusButton = new Button { Content = "-", MinWidth=FontSize*1.5 };
+      minusButton.Click += MinusButton_Click;
+      tabItemStackPanel.Children.Add(minusButton);
+
+      pageNoTextBox = new TextBox { MinWidth=30 };
+      pageNoTextBox.TextChanged += PageNoTextBox_TextChanged;
+      tabItemStackPanel.Children.Add(pageNoTextBox);
+
+      var plusButton = new Button { Content = "+", MinWidth=FontSize*1.5 };
+      plusButton.Click += PlusButton_Click;
+      tabItemStackPanel.Children.Add(plusButton);
+
+      var plus2Button = new Button { Content = "++", MinWidth=FontSize*1.5 };
+      plus2Button.Click += Plus2Button_Click;
+      tabItemStackPanel.Children.Add(plus2Button);
+
+      endButton = new Button { MinWidth=FontSize*1.5 };
+      endButton.Click += EndButton_Click;
+      tabItemStackPanel.Children.Add(endButton);
+
+      var pageTabItem = new TabItem {
+        Header = tabItemStackPanel
+      };
+      return pageTabItem;
     }
 
 
-    private void previousButton_Click(object sender, RoutedEventArgs e) {
-      navigate(isNext: false);
+    private void PageNoTextBox_TextChanged(object sender, TextChangedEventArgs e) {
+      if (pdfParser is null) return;
+
+      if (uint.TryParse(pageNoTextBox?.Text, out var newPageNo)) {
+        if (newPageNo>=pdfParser!.Pages.Count) return;
+
+        pageNo = (int)newPageNo;
+        fillTabItemContent(pageControllerTabItem!, pdfParser!.Pages[(int)pageNo]);
+        MainPdfViewer.ShowPage(pageNo);
+      }
+
     }
 
 
-    private void navigate(bool isNext) {
+    private void ZeroButton_Click(object sender, RoutedEventArgs e) {
+      pageNo = 0;
+      pageNoTextBox!.Text = pageNo.ToString();
+      pageControllerTabItem!.Focus();
+    }
+
+
+    private void Minus2Button_Click(object sender, RoutedEventArgs e) {
+      if (pageNo<=0) return;
+
+      pageNo = pageNo<=9 ? 0 : pageNo-10;
+      pageNoTextBox!.Text = pageNo.ToString();
+      pageControllerTabItem!.Focus();
+    }
+
+
+    private void MinusButton_Click(object sender, RoutedEventArgs e) {
+      if (pageNo<=0) return;
+
+      pageNo--;
+      pageNoTextBox!.Text = pageNo.ToString();
+      pageControllerTabItem!.Focus();
+    }
+
+
+    private void PlusButton_Click(object sender, RoutedEventArgs e) {
+      var newPageNo = pageNo + 1;
+      if (newPageNo>=pdfParser!.Pages.Count) return;
+
+      pageNo = newPageNo;
+      pageNoTextBox!.Text = pageNo.ToString();
+      pageControllerTabItem!.Focus();
+    }
+
+
+    private void Plus2Button_Click(object sender, RoutedEventArgs e) {
+      var newPageNo = pageNo + 10;
+
+      pageNo = newPageNo>=pdfParser!.Pages.Count ? pdfParser!.Pages.Count - 1 :  newPageNo;
+      pageNoTextBox!.Text = pageNo.ToString();
+      pageControllerTabItem!.Focus();
+    }
+
+
+    private void EndButton_Click(object sender, RoutedEventArgs e) {
+      pageNo =pdfParser!.Pages.Count - 1;
+      pageNoTextBox!.Text = pageNo.ToString();
+      pageControllerTabItem!.Focus();
+    }
+
+
+    bool isPageControllerShown;
+    #endregion
+
+
+    #region Navigation and Pdf Page Display
+    //      -------------------------------
+
+    private async void navigate(bool isNext) {
+      System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+    "MainWindow navigate() started");
       //pdfRefRunTrace.Clear();
       BackStatusBarItem.Visibility = Visibility.Collapsed;
 
@@ -291,12 +470,17 @@ namespace PdfFilesTextBrowser {
       FileTextBox.Text = file.FullName;
       fileString = FileTextBox.Text;
       PagesTabControl.Items.Clear();
+      closeRegisteredWindows();
 
       //display pdf
       try {
         MainPdfViewer.Visibility = Visibility.Visible;
         PdfTextBox.Visibility = Visibility.Collapsed;
-        MainPdfViewer.PdfPath = file.FullName;
+        System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+          "MainWindow MainPdfViewer.Load() started");
+        MainPdfViewer.Load(file.FullName);
+        System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+          "MainWindow  MainPdfViewer.Load() returned");
 
       } catch (Exception ex) {
         MainPdfViewer.Visibility = Visibility.Collapsed;
@@ -305,10 +489,15 @@ namespace PdfFilesTextBrowser {
       }
 
       //parse pdf
-      PdfParser pdfParser;
       try {
-        pdfParser = new PdfParser(file.FullName, "", "|", streamBuffer, stringBuilder);
+        System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+          "MainWindow.navigate() await pdfParser = new PdfParser()");
+        pdfParser = await Task.Run<PdfParser?>(() => {
+          return new PdfParser(file.FullName, "", "|", streamBuffer, stringBuilder);
+        });
       } catch (Exception ex) {
+        System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+          $"MainWindow.navigate() await pdfParser = new PdfParser(); Exception: {ex.Message}");
         var exceptionTabItem = new TabItem {
           Header = "E_xception"
         };
@@ -327,15 +516,23 @@ namespace PdfFilesTextBrowser {
         PagesTabControl.SelectedIndex = 0;
         return;
       }
+      System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+        "MainWindow.navigate() await pdfParser = new PdfParser() completed");
 
       var pageIndex = 0;
-      if (pdfParser.Pages.Count>maxPages) {
-        var pageTabItem = new TabItem {
-          Header = pageIndex
-        };
-        addTabItemContent(pageTabItem, pdfParser.Pages[pageIndex]);
+      //if (pdfParser.Pages.Count>maxPages) {
+      if (pdfParser!.Pages.Count>4) {
+        isPageControllerShown = true;
+        if (pageControllerTabItem is null) {
+          pageControllerTabItem = createPageControllerTabItem();
+        }
+        pageNo = 0;
+        pageNoTextBox!.Text = pageNo.ToString();
+        endButton!.Content = (pdfParser.Pages.Count-1).ToString();
+        PagesTabControl.Items.Add(pageControllerTabItem);
 
       } else {
+        isPageControllerShown = false;
         foreach (var page in pdfParser.Pages) {
           var underline = "";
           if (pageIndex<10) {
@@ -344,7 +541,8 @@ namespace PdfFilesTextBrowser {
           var pageTabItem = new TabItem {
             Header = underline + pageIndex++
           };
-          addTabItemContent(pageTabItem, page);
+          fillTabItemContent(pageTabItem, page);
+          PagesTabControl.Items.Add(pageTabItem);
         }
       }
 
@@ -435,33 +633,48 @@ namespace PdfFilesTextBrowser {
       //PagesTabControl.SelectedIndex = 0;
       //////////////////////////////////////////////////////////////////////////
 
-      bytesTextViwer.Load(tokeniser);
+      System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+        $"MainWindow.navigate(): await bytesTextViwer.LoadAsync() started");
+      await bytesTextViwer.LoadAsync(tokeniser);
+      System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {Thread.CurrentThread.ManagedThreadId} " +
+        $"MainWindow.navigate(): await bytesTextViwer.LoadAsync() completed");
       bytesTabItem.Content = bytesTextViwer;
       PagesTabControl.Items.Add(bytesTabItem);
 
       PagesTabControl.SelectedIndex = 0;
-
+      System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+    "MainWindow navigate() completed");
     }
 
-    private void addTabItemContent(TabItem pageTabItem, PdfPage page) {
+
+    Brush? originalPageTabItemBackground;
+
+
+    private void fillTabItemContent(TabItem pageTabItem, PdfPage page) {
       var hasException = false;
       stringBuilder.Clear();
       var isFirstContent = true;
+      var hasContent = false;
       foreach (var content in page.Contents) {
         if (isFirstContent) {
           isFirstContent = false;
         } else {
           stringBuilder.AppendLine(new string('-', 80));
         }
-        stringBuilder.AppendLine(content.Text);
+        if (content.Text?.Length>0) {
+          hasContent = true;
+          stringBuilder.AppendLine(content.Text);
+        }
         if (content.Exception!=null) {
           hasException = true;
+          hasContent = true;
           stringBuilder.AppendLine(new string('+', 80));
           stringBuilder.AppendLine(content.Exception);
           stringBuilder.AppendLine(new string('+', 80));
         }
         if (content.Error!=null) {
           hasException = true;
+          hasContent = true;
           stringBuilder.AppendLine(new string('+', 80));
           stringBuilder.AppendLine(content.Error);
           stringBuilder.AppendLine(new string('+', 80));
@@ -469,23 +682,36 @@ namespace PdfFilesTextBrowser {
       }
 
       if (page.Exception!=null) {
+        hasContent = true;
         hasException = true;
         stringBuilder.AppendLine(new string('+', 80));
         stringBuilder.AppendLine(page.Exception);
         stringBuilder.AppendLine(new string('+', 80));
       }
       var textBox = new TextBox {
-        Text = stringBuilder.ToString(),
+        Text = hasContent ? stringBuilder.ToString() : $"This pdf page has no text conten. Is it just a scan ?",
         VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
         IsReadOnly = true
       };
 
+      if (originalPageTabItemBackground is null) {
+        originalPageTabItemBackground = pageTabItem.Background;
+      }
       if (hasException) {
         pageTabItem.Background = Brushes.Khaki;
+      } else {
+        pageTabItem.Background = originalPageTabItemBackground;
       }
       pageTabItem.Content = textBox;
-      PagesTabControl.Items.Add(pageTabItem);
     }
+
+
+    private void PagesTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e) {
+      if (isPageControllerShown || PagesTabControl.SelectedIndex<0 || PagesTabControl.SelectedIndex>=(pdfParser?.Pages.Count??0)) return;
+
+      MainPdfViewer.ShowPage(PagesTabControl.SelectedIndex);
+    }
+    #endregion
   }
 }

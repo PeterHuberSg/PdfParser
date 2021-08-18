@@ -106,7 +106,7 @@ namespace PdfParserLib {
           isCarriageReturn = false;
           continue;
         }
-
+        
         isCarriageReturn = pdfByte==0xd;
         if (isCarriageReturn || pdfByte==0xa) {
           //end of line found

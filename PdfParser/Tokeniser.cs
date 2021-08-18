@@ -1617,34 +1617,55 @@ namespace PdfParserLib {
         length = int.MinValue;
         return int.MinValue;
       }
-      while (bytes[bytesIndex++]!=lf) { }
+      while (true) {
+        //search for next lf. according to specification the last char before the actual stream content should be lf. But
+        //some pdf writers use only a cr before the stream content. Others do it properly and have a cr followed by a lf.
+        var c = bytes[bytesIndex++];
+        if (c==lf) break;
+
+        if (c==cr) {
+          c = bytes[bytesIndex];
+          if (c==lf) {
+            //lf should follow cr
+            bytesIndex++;
+          }
+          break;
+        }
+      }
+
       var streamStartIndex = bytesIndex;
       var lengthToken = dictionaryToken["Length"];
       if (lengthToken is NumberToken lengthNumberToken) {
         //check if length really points to endstream
         length = lengthNumberToken.Integer!.Value;
-        bytesIndex += length;
-        SkipWhiteSpace();
-        var endstreamIndex = bytesIndex;
-        if (bytes[bytesIndex++]=='e' &&
-          bytes[bytesIndex++]=='n' &&
-          bytes[bytesIndex++]=='d' &&
-          bytes[bytesIndex++]=='s' &&
-          bytes[bytesIndex++]=='t' &&
-          bytes[bytesIndex++]=='r' &&
-          bytes[bytesIndex++]=='e' &&
-          bytes[bytesIndex++]=='a' &&
-          bytes[bytesIndex++]=='m') 
-        {
-          return streamStartIndex;
-        }
+        var endstreamIndex = bytesIndex + length;
+        if (endstreamIndex>bytes.Length-20) {
+          dictionaryToken.StreamLengthProblem +=
+            $"Pdf content stream: Length {length} points after last byte {bytes.Length} in pdf file." + Environment.NewLine +
+            ShowBufferContentAtIndex();
+        } else {
+          bytesIndex += length;
+          SkipWhiteSpace();
+          endstreamIndex = bytesIndex;
+          if (bytes[bytesIndex++]=='e' &&
+            bytes[bytesIndex++]=='n' &&
+            bytes[bytesIndex++]=='d' &&
+            bytes[bytesIndex++]=='s' &&
+            bytes[bytesIndex++]=='t' &&
+            bytes[bytesIndex++]=='r' &&
+            bytes[bytesIndex++]=='e' &&
+            bytes[bytesIndex++]=='a' &&
+            bytes[bytesIndex++]=='m') {
+            return streamStartIndex;
+          }
 
-        //length did not point to endstream
-        bytesIndex = endstreamIndex;
-        dictionaryToken.StreamLengthProblem += 
-          $"Pdf content stream: Length {length} does not point to endstream." + Environment.NewLine + 
-          ShowBufferContentAtIndex();
-        bytesIndex = streamStartIndex;
+          //length did not point to endstream
+          bytesIndex = endstreamIndex;
+          dictionaryToken.StreamLengthProblem +=
+            $"Pdf content stream: Length {length} does not point to endstream." + Environment.NewLine +
+            ShowBufferContentAtIndex();
+          bytesIndex = streamStartIndex;
+        }
       }
 
       //just search endstream
@@ -1704,7 +1725,7 @@ namespace PdfParserLib {
     #region Stream Methods
     //      --------------
 
-    public (DictionaryToken?, ReadOnlyMemory<byte>)? GetStream(ObjectId objectId) {
+    public (DictionaryToken?, ReadOnlyMemory<byte>?)? GetStream(ObjectId objectId) {
       var token = GetToken(objectId);
       if (token is NullToken) {
         //couldn't find in xref. Search in bytes
@@ -1735,6 +1756,10 @@ namespace PdfParserLib {
 
       }
       if (token is DictionaryToken dictionaryToken) {
+        if (dictionaryToken.StreamLengthProblem is not null) {
+          //something is wrong with stream length. Return dictionaryToken so that caller can display StreamLengthProblem
+          return (dictionaryToken, null);
+        }
         dictionaryToken.GetStreamBytes();
         return (dictionaryToken, streamBytes);
       }

@@ -3,6 +3,7 @@ using PdfParserLib;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -17,6 +18,9 @@ namespace PdfFilesTextBrowser {
 
     #region Properties
     //      ----------
+
+    public bool IsLoadError { get; private set; }
+
 
     public readonly TextStore TextStore = new();
 
@@ -54,6 +58,8 @@ namespace PdfFilesTextBrowser {
     readonly MenuItem zoomResetMenuItem;
     readonly MenuItem zoomOutMenuItem;
 
+    readonly TextBox errorTextBox;
+
 
     /// <summary>
     /// Default constructor
@@ -65,8 +71,6 @@ namespace PdfFilesTextBrowser {
         Orientation= Orientation.Vertical,
         VerticalAlignment = VerticalAlignment.Stretch,
       };
-
-
       AddChild(verticalScrollBar);
 
       horizontalScrollBar = new ScrollBar {
@@ -122,6 +126,14 @@ namespace PdfFilesTextBrowser {
       zoomOutMenuItem = new MenuItem { Header = "Zoom Out", InputGestureText = "Ctrl+'-'" };
       zoomOutMenuItem.Click += zoomOutMenuItem_Click;
       ContextMenu.Items.Add(zoomOutMenuItem);
+
+      errorTextBox = new TextBox {
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        VerticalAlignment = VerticalAlignment.Stretch,
+        Visibility = Visibility.Collapsed,
+        IsReadOnly = true,
+      };
+      AddChild(errorTextBox);
     }
     #endregion
 
@@ -511,15 +523,14 @@ namespace PdfFilesTextBrowser {
 
     Tokeniser tokeniser;
 
-    public void Load(Tokeniser tokeniser) {
+
+    public async Task LoadAsync(Tokeniser tokeniser) {
       this.tokeniser = tokeniser;
       zoomFactor = 1;
       TextStore.Reset();
       textViewerGlyph.Reset();
       TextViewerSelection.Reset();
       anchors.Clear();
-      PdfToTextStore.Convert(tokeniser, TextStore, anchors);
-
       ///////////////////
       //TextStore.Append(new byte[] { (byte)'W', (byte)'n', (byte)'m', (byte)'d', (byte)'e', (byte)'f', (byte)'g', (byte)'h', (byte)'i', (byte)'j', (byte)'k', (byte)'l', (byte)'m', (byte)'n', (byte)'o', (byte)'\r' });
       //TextStore.Append(new byte[] { (byte)'i', (byte)'A', (byte)'B', (byte)'C', (byte)'D', (byte)'E', (byte)'F', (byte)'G', (byte)'H', (byte)'I', (byte)'J', (byte)'K', (byte)'L', (byte)'M', (byte)'N', (byte)'O', (byte)'\r' });
@@ -532,11 +543,26 @@ namespace PdfFilesTextBrowser {
       //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'A', (byte)'B', (byte)'C', (byte)'D', (byte)'E', (byte)'F', (byte)'G', (byte)'H', (byte)'I', (byte)'J', (byte)'K', (byte)'L', (byte)'M', (byte)'N', (byte)'O', (byte)'\r' });
       //TextStore.Append(new byte[] { (byte)'1', (byte)'\r', (byte)'2', (byte)'\r', (byte)'3', (byte)'\r', (byte)'4', (byte)'\r', (byte)'5', (byte)'\r', (byte)'6', (byte)'\r', (byte)'7', (byte)'\r', (byte)'8', (byte)'\r', (byte)'9', (byte)'\r', (byte)'0', (byte)'\r' });
       //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'1', (byte)'2', (byte)'3', (byte)'{', (byte)'b', (byte)'4', (byte)'5', (byte)'6', (byte)'}', (byte)'7', (byte)'8', (byte)'9', (byte)'\r' });
+      //InvalidateVisual();
       ///////////////////
-      //verticalScrollBar.Maximum = TextStore.LinesCount-LinesPerPage + 1;
-      //verticalScrollBar.Value = 0;
-      InvalidateVisual();
-      //Log($"Load() scrollBar.Value: {scrollBar.Value}");
+
+      System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+        $"TextViewer.LoadAsync(): PdfToTextStore.Convert() started");
+      var returnString = await Task.Run(() => {
+        var returnString = PdfToTextStore.Convert(tokeniser, TextStore, anchors);
+        System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
+          $"TextViewer.LoadAsync(): PdfToTextStore.Convert() completed");
+        return returnString;
+      });
+      if (returnString is null) {
+        IsLoadError = false;
+        errorTextBox.Visibility = Visibility.Collapsed;
+        InvalidateVisual();
+      } else {
+        IsLoadError = true;
+        errorTextBox.Visibility = Visibility.Visible;
+        errorTextBox.Text = returnString;
+      }
     }
 
 
@@ -646,39 +672,48 @@ namespace PdfFilesTextBrowser {
     //      ---------------------------
 
     protected override Size MeasureContentOverride(Size constraint) {
-      verticalScrollBar.Measure(constraint);
-      horizontalScrollBar.Measure(constraint);
-      zoomButton.Measure(new Size(verticalScrollBar.DesiredSize.Width, horizontalScrollBar.DesiredSize.Height));
-      var remainingWidth = constraint.Width - verticalScrollBar.DesiredSize.Width;
-      var remainingHeight = constraint.Height - horizontalScrollBar.DesiredSize.Height;
-      if (remainingWidth>0 && remainingHeight>0) {
-        TextViewerSelection.Measure(new Size(remainingWidth, remainingHeight));
-        textViewerGlyph.Measure(new Size(remainingWidth, remainingHeight));
+      if (IsLoadError) {
+        errorTextBox.Measure(constraint);
+      } else {
+        verticalScrollBar.Measure(constraint);
+        horizontalScrollBar.Measure(constraint);
+        zoomButton.Measure(new Size(verticalScrollBar.DesiredSize.Width, horizontalScrollBar.DesiredSize.Height));
+        var remainingWidth = constraint.Width - verticalScrollBar.DesiredSize.Width;
+        var remainingHeight = constraint.Height - horizontalScrollBar.DesiredSize.Height;
+        if (remainingWidth>0 && remainingHeight>0) {
+          TextViewerSelection.Measure(new Size(remainingWidth, remainingHeight));
+          textViewerGlyph.Measure(new Size(remainingWidth, remainingHeight));
+        }
       }
       return constraint;
     }
 
 
     protected override Size ArrangeContentOverride(Rect arrangeRect) {
-      var verticalScrollBarX = arrangeRect.Width - verticalScrollBar.DesiredSize.Width;
-      var horizontalScrollBarY = arrangeRect.Height - horizontalScrollBar.DesiredSize.Height;
-      if (horizontalScrollBarY>0) {
-        verticalScrollBar.ArrangeBorderPadding(arrangeRect, verticalScrollBarX, 0,
-          verticalScrollBar.DesiredSize.Width, horizontalScrollBarY);
-        setupVerticalScrollBar(horizontalScrollBarY);
-      }
-      if (verticalScrollBarX>0) {
-        horizontalScrollBar.ArrangeBorderPadding(arrangeRect, 0, horizontalScrollBarY,
-          verticalScrollBarX, horizontalScrollBar.DesiredSize.Height);
+      if (IsLoadError) {
+        errorTextBox.ArrangeBorderPadding(arrangeRect, 0, 0, arrangeRect.Width, arrangeRect.Height);
 
-        setupHorizontalScrollBar(verticalScrollBarX);
-      }
-      zoomButton.ArrangeBorderPadding(arrangeRect, verticalScrollBarX, horizontalScrollBarY,
-        verticalScrollBar.DesiredSize.Width, horizontalScrollBar.DesiredSize.Height);
-      if (horizontalScrollBarY>0 && verticalScrollBarX>0) {
-        TextViewerSelection.ArrangeBorderPadding(arrangeRect, 0, 0, verticalScrollBarX,
-          horizontalScrollBarY);
-        textViewerGlyph.ArrangeBorderPadding(arrangeRect, 0, 0, verticalScrollBarX, horizontalScrollBarY);
+      } else {
+        var verticalScrollBarX = arrangeRect.Width - verticalScrollBar.DesiredSize.Width;
+        var horizontalScrollBarY = arrangeRect.Height - horizontalScrollBar.DesiredSize.Height;
+        if (horizontalScrollBarY>0) {
+          verticalScrollBar.ArrangeBorderPadding(arrangeRect, verticalScrollBarX, 0,
+            verticalScrollBar.DesiredSize.Width, horizontalScrollBarY);
+          setupVerticalScrollBar(horizontalScrollBarY);
+        }
+        if (verticalScrollBarX>0) {
+          horizontalScrollBar.ArrangeBorderPadding(arrangeRect, 0, horizontalScrollBarY,
+            verticalScrollBarX, horizontalScrollBar.DesiredSize.Height);
+
+          setupHorizontalScrollBar(verticalScrollBarX);
+        }
+        zoomButton.ArrangeBorderPadding(arrangeRect, verticalScrollBarX, horizontalScrollBarY,
+          verticalScrollBar.DesiredSize.Width, horizontalScrollBar.DesiredSize.Height);
+        if (horizontalScrollBarY>0 && verticalScrollBarX>0) {
+          TextViewerSelection.ArrangeBorderPadding(arrangeRect, 0, 0, verticalScrollBarX,
+            horizontalScrollBarY);
+          textViewerGlyph.ArrangeBorderPadding(arrangeRect, 0, 0, verticalScrollBarX, horizontalScrollBarY);
+        }
       }
       return arrangeRect.Size;
     }
