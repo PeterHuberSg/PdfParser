@@ -149,8 +149,7 @@ namespace PdfParserLib {
       string password = "",
       string contentDelimiter = "|",
       byte[]? workingBuffer = null,
-      StringBuilder? stringBuilder = null) 
-    {
+      StringBuilder? stringBuilder = null) {
       bytes = pdBfytes;
       this.password = password;
       trailerDictionaries = new List<DictionaryToken>();
@@ -996,7 +995,7 @@ namespace PdfParserLib {
 
       byte[] rc4Key = new byte[globalEncryptionKey.Length];
       for (int i = 0; i<20; ++i) {//d), e)
-        for (int j=0; j < rc4Key.Length; ++j) {
+        for (int j = 0; j < rc4Key.Length; ++j) {
           rc4Key[j] = (byte)(globalEncryptionKey[j] ^ i);
         }
         rc4DataBytes = RC4.Encrypt(rc4Key, rc4DataBytes);//f)
@@ -1013,12 +1012,11 @@ namespace PdfParserLib {
 
 
     private byte[] computeGlobalEncryptionKey(
-      byte[] ownerKeyOrPaddedPassword, 
-      byte[] encryptO, 
-      int permission, 
+      byte[] ownerKeyOrPaddedPassword,
+      byte[] encryptO,
+      int permission,
       byte[] idBytes,
-      int encodeLengthInBytes) 
-    {
+      int encodeLengthInBytes) {
       traceMethod("computeGlobalEncryptionKey()");
       //var inputBytesCount = ownerKey.Length + o.Length + /*p*/4 + idBytes.Length + metadataPad.Length;
       var inputBytes = new byte[ownerKeyOrPaddedPassword.Length + encryptO.Length + /*p*/4 + idBytes.Length];
@@ -1210,11 +1208,19 @@ namespace PdfParserLib {
     /// Shows the pdf file content at the present reading position
     /// </summary>
     public string ShowBufferContentAtIndex() {
-      var startEarlier = Math.Max(0, bytesIndex-100);
-      var endLater = Math.Min(bytes.Length, bytesIndex+100);
+      return ShowBufferContentAtIndex(bytesIndex);
+    }
+
+
+    /// <summary>
+    /// Shows the pdf file content at provided index
+    /// </summary>
+    public string ShowBufferContentAtIndex(int index) {
+      var startEarlier = Math.Max(0, index-100);
+      var endLater = Math.Min(bytes.Length, index+100);
       var sb = new StringBuilder();
       int showIndex = startEarlier;
-      for (; showIndex < bytesIndex; showIndex++) {
+      for (; showIndex < index; showIndex++) {
         append(sb, bytes[showIndex]);
       }
       //sb.AppendLine();
@@ -1253,7 +1259,7 @@ namespace PdfParserLib {
 
 
     /// <summary>
-    /// Shows the pdf file content at the present reading position
+    /// Shows the complete pdf file content, skipping over stream content
     /// </summary>
     public string ShowBufferContent() {
       var sb = new StringBuilder();

@@ -72,7 +72,9 @@ namespace PdfFilesTextBrowser {
       //FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202004.pdf";
       //FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202104.pdf";
       //FileTextBox.Text = @"D:\PDF32000_2008.pdf";
-      FileTextBox.Text = @"D:\Abmelung Horgen.pdf";
+      //FileTextBox.Text = @"D:\Abmelung Horgen.pdf";
+      FileTextBox.Text = @"D:\comparison-of-private-hospital-ips.pdf";
+    
 
       //xref stream
 
@@ -375,6 +377,10 @@ namespace PdfFilesTextBrowser {
     #region Navigation and Pdf Page Display
     //      -------------------------------
 
+
+    TabItem? bytesTabItem;
+
+
     private async void navigate(bool isNext) {
       System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
     "MainWindow navigate() started");
@@ -520,8 +526,7 @@ namespace PdfFilesTextBrowser {
         "MainWindow.navigate() await pdfParser = new PdfParser() completed");
 
       var pageIndex = 0;
-      //if (pdfParser.Pages.Count>maxPages) {
-      if (pdfParser!.Pages.Count>4) {
+      if (pdfParser!.Pages.Count>maxPages) {
         isPageControllerShown = true;
         if (pageControllerTabItem is null) {
           pageControllerTabItem = createPageControllerTabItem();
@@ -595,7 +600,7 @@ namespace PdfFilesTextBrowser {
       infoTabItem.Content = textBoxInfo;
       PagesTabControl.Items.Add(infoTabItem);
 
-      var bytesTabItem = new TabItem {
+      bytesTabItem = new TabItem {
         Header = "_Bytes"
       };
       //var bytesContextMenu = new ContextMenu();
@@ -704,6 +709,16 @@ namespace PdfFilesTextBrowser {
         pageTabItem.Background = originalPageTabItemBackground;
       }
       pageTabItem.Content = textBox;
+    }
+
+
+    internal void SetBytesTab(bool isError) {
+      if (isError) {
+        bytesTabItem!.Background = Brushes.Khaki;
+      } else {
+        bytesTabItem!.Background = originalPageTabItemBackground;
+      }
+      ;
     }
 
 

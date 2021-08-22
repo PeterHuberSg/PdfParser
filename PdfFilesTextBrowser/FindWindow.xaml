@@ -8,7 +8,7 @@
         Title="FindWindow" SizeToContent="WidthAndHeight">
     <Grid Background="Gainsboro">
     <Grid.RowDefinitions>
-      <RowDefinition Height="auto"/>
+      <RowDefinition Height="*"/>
       <RowDefinition Height="auto"/>
       <RowDefinition Height="auto"/>
       <RowDefinition Height="auto"/>
@@ -20,7 +20,8 @@
 
     <Label Grid.Row="0" Grid.Column="0" Content="_Text" Target="{Binding ElementName=TextTextbox}"/>
     <Border Grid.Row="0" Grid.Column="1" x:Name="TextBorder" VerticalAlignment="Center" BorderThickness="1">
-      <TextBox x:Name="TextTextbox" VerticalAlignment="Center"/>
+      <TextBox x:Name="TextTextbox" VerticalAlignment="Center" VerticalScrollBarVisibility="auto" 
+               HorizontalScrollBarVisibility="auto"/>
     </Border>
 
     <Label Grid.Row="1" Grid.Column="0" Content="_Ignore Case" Target="{Binding ElementName=IgnoreCaseCheckBox}"/>

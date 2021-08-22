@@ -130,6 +130,8 @@ namespace PdfFilesTextBrowser {
       errorTextBox = new TextBox {
         HorizontalAlignment = HorizontalAlignment.Stretch,
         VerticalAlignment = VerticalAlignment.Stretch,
+        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
         Visibility = Visibility.Collapsed,
         IsReadOnly = true,
       };
@@ -548,21 +550,32 @@ namespace PdfFilesTextBrowser {
 
       System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
         $"TextViewer.LoadAsync(): PdfToTextStore.Convert() started");
-      var returnString = await Task.Run(() => {
+      var returnException = await Task.Run(() => {
         var returnString = PdfToTextStore.Convert(tokeniser, TextStore, anchors);
         System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
           $"TextViewer.LoadAsync(): PdfToTextStore.Convert() completed");
         return returnString;
       });
-      if (returnString is null) {
+      if (returnException is null) {
         IsLoadError = false;
-        errorTextBox.Visibility = Visibility.Collapsed;
-        InvalidateVisual();
+        MainWindow.Current!.SetBytesTab(isError: false);
       } else {
         IsLoadError = true;
-        errorTextBox.Visibility = Visibility.Visible;
-        errorTextBox.Text = returnString;
+        TextStore.AppendError("Exception:", returnException.ToDetailString());
+        MainWindow.Current!.SetBytesTab(isError: true);
       }
+      InvalidateVisual();
+      //if (returnString is null) {
+      //  IsLoadError = false;
+      //  errorTextBox.Visibility = Visibility.Collapsed;
+      //  MainWindow.Current!.SetBytesTab(isError: false);
+      //  InvalidateVisual();
+      //} else {
+      //  IsLoadError = true;
+      //  errorTextBox.Visibility = Visibility.Visible;
+      //  errorTextBox.Text = returnString;
+      //  MainWindow.Current!.SetBytesTab(isError: true);
+      //}
     }
 
 
@@ -672,9 +685,9 @@ namespace PdfFilesTextBrowser {
     //      ---------------------------
 
     protected override Size MeasureContentOverride(Size constraint) {
-      if (IsLoadError) {
-        errorTextBox.Measure(constraint);
-      } else {
+      //if (IsLoadError) {
+      //  errorTextBox.Measure(constraint);
+      //} else {
         verticalScrollBar.Measure(constraint);
         horizontalScrollBar.Measure(constraint);
         zoomButton.Measure(new Size(verticalScrollBar.DesiredSize.Width, horizontalScrollBar.DesiredSize.Height));
@@ -684,16 +697,16 @@ namespace PdfFilesTextBrowser {
           TextViewerSelection.Measure(new Size(remainingWidth, remainingHeight));
           textViewerGlyph.Measure(new Size(remainingWidth, remainingHeight));
         }
-      }
+      //}
       return constraint;
     }
 
 
     protected override Size ArrangeContentOverride(Rect arrangeRect) {
-      if (IsLoadError) {
-        errorTextBox.ArrangeBorderPadding(arrangeRect, 0, 0, arrangeRect.Width, arrangeRect.Height);
+      //if (IsLoadError) {
+      //  errorTextBox.ArrangeBorderPadding(arrangeRect, 0, 0, arrangeRect.Width, arrangeRect.Height);
 
-      } else {
+      //} else {
         var verticalScrollBarX = arrangeRect.Width - verticalScrollBar.DesiredSize.Width;
         var horizontalScrollBarY = arrangeRect.Height - horizontalScrollBar.DesiredSize.Height;
         if (horizontalScrollBarY>0) {
@@ -714,7 +727,7 @@ namespace PdfFilesTextBrowser {
             horizontalScrollBarY);
           textViewerGlyph.ArrangeBorderPadding(arrangeRect, 0, 0, verticalScrollBarX, horizontalScrollBarY);
         }
-      }
+      //}
       return arrangeRect.Size;
     }
 

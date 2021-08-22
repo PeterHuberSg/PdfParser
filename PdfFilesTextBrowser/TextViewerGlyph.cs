@@ -346,7 +346,7 @@ namespace PdfFilesTextBrowser {
               //second '{' found, just write it
               break;
 
-            case 'a':
+            case 'a': //anchor, links can point to it
               isUnFormatted = false;
               displayedGlyphWidths.Add(0);
               if (markAnchor is not null) {
@@ -361,7 +361,7 @@ namespace PdfFilesTextBrowser {
               isUnderline = false;
               break;
 
-            case 'b':
+            case 'b': //blue
               isUnFormatted = false;
               displayedGlyphWidths.Add(0);
               codePoint = int.MinValue;
@@ -372,7 +372,7 @@ namespace PdfFilesTextBrowser {
               isUnderline = false;
               break;
 
-            case 'B':
+            case 'B': //bold
               isUnFormatted = false;
               displayedGlyphWidths.Add(0);
               codePoint = int.MinValue;
@@ -380,6 +380,17 @@ namespace PdfFilesTextBrowser {
                 isLineStartFound, xOffset, drawingContext);
               glyphTypeface = glyphTypefaceBold;
               brush = Brushes.Black;
+              isUnderline = false;
+              break;
+
+            case 'e': //error
+              isUnFormatted = false;
+              displayedGlyphWidths.Add(0);
+              codePoint = int.MinValue;
+              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin,
+                isLineStartFound, xOffset, drawingContext);
+              glyphTypeface = glyphTypefaceBold;
+              brush = Brushes.DarkRed;
               isUnderline = false;
               break;
 
@@ -482,7 +493,7 @@ namespace PdfFilesTextBrowser {
                 if (textViewer.Anchors.TryGetValue(objectIdString, out var anchor)) {
                   textViewer.TextViewerObjects.AddLink(anchor, displayedAbsoluteLineIndex, origin.X, origin.X + glyphRunWidth);
                 } else {
-                  System.Diagnostics.Debugger.Break();
+                  //System.Diagnostics.Debugger.Break(); //anchors are not available when an exception occured
                 }
 
               } else if (isStream) {

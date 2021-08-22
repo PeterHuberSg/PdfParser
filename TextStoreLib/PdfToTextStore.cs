@@ -31,11 +31,11 @@ namespace PdfParserLib {
       end_d,
       endobj_o,
       endobj_b,
-      endstream_s,
-      endstream_t,
-      endstream_r,
-      endstream_e,
-      endstream_a,
+      //////endstream_s,
+      //////endstream_t,
+      //////endstream_r,
+      //////endstream_e,
+      //////endstream_a,
     }
 
 
@@ -45,10 +45,11 @@ namespace PdfParserLib {
     static readonly byte[] formatStart = {(byte)'{'};
 
     static readonly byte[] formatStream = {(byte)' ', (byte)'{', (byte)'s'};
-    static readonly byte[] formatStreamEnd = { (byte)'}', (byte)' '};
+    static readonly byte[] formatStreamEnd = { (byte)'}', (byte)' ' };
+    static readonly byte[] endstream = { (byte)'e', (byte)'n', (byte)'d', (byte)'s', (byte)'t', (byte)'r', (byte)'e', (byte)'a', (byte)'m' };
 
 
-    public static string? Convert(Tokeniser tokeniser, TextStore textStore, Dictionary<string, TextViewerAnchor> anchors){
+    public static Exception? Convert(Tokeniser tokeniser, TextStore textStore, Dictionary<string, TextViewerAnchor> anchors){
       System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {Thread.CurrentThread.ManagedThreadId} PdfToTextStore.Convert() start");
       try {
         var state = stateEnum.parse;
@@ -242,17 +243,39 @@ namespace PdfParserLib {
               var streamObjectIdSpan = pdfBytesArray.AsSpan(streamObjectIdStart, streamObjectIdEnd-streamObjectIdStart);
               textStore.Append(streamObjectIdSpan);
               textStore.Append(formatStreamEnd);
-              var streamDictionaryToken = (DictionaryToken)tokeniser.GetToken(new ObjectId(streamObjectIdSpan));
-              //skip stream bytes
-              bytesIndex = startIndex = streamDictionaryToken.StreamStartIndex + streamDictionaryToken.Length;
+              var streamToken = tokeniser.GetToken(new ObjectId(streamObjectIdSpan));
+              if (streamToken is DictionaryToken streamDictionaryToken) {
+                //skip stream bytes
+                bytesIndex = startIndex = streamDictionaryToken.StreamStartIndex + streamDictionaryToken.Length;
+              } else {
+                //can't find ObjectId in xref table. Search for endstream instead
+                var endstreamIndex = 0;
+                do {
+                  if (bytesIndex>=pdfBytesArray.Length) throw new Exception(
+                    $"Could not find ObjectId {streamObjectIdSpan.ToString()} in xref table nor 'endstream' in the pdf file.");
 
-              //var obj = objectObjectId!.Value;
-              //sb.Append($"[s{obj.ObjectNumber}; Gen: {obj.Generation}]");
-              //isSkipStreamChars = true;
-              //var skipLenght = Math.Min(5, sb.Length);
-              //sb.Length -= skipLenght;
-              //paragraph.Inlines.Add(new Run(sb.ToString()));
-              //sb.Clear();
+                  b = pdfBytesArray[bytesIndex++];
+                  if (b==endstream[endstreamIndex]) {
+                    endstreamIndex++;
+                  } else {
+                    endstreamIndex = 0;
+                  }
+                } while (endstreamIndex<endstream.Length);
+                bytesIndex -= endstream.Length + 1;
+                b = pdfBytesArray[bytesIndex];
+                if (b=='\n') {
+                  bytesIndex--;//skip backwards over line feed
+                  if (pdfBytesArray[bytesIndex-1]=='\r') {
+                    bytesIndex--;//skip backwards over carriage return and line feed
+                  }
+                }else if (b=='\r') {
+                  bytesIndex--;//skip backwards over carriage return
+                } else {
+                  throw new Exception($"Stream with ObjectId {streamObjectIdSpan.ToString()} is missing in xref table. " +
+                    "'endstream' is not preceedet carriage return or line feed.");
+                }
+                startIndex = bytesIndex;
+              }
             }
             state = stateEnum.parse;
             break;
@@ -276,8 +299,8 @@ namespace PdfParserLib {
           case stateEnum.end_d:
             if (b=='o') {
               state = stateEnum.endobj_o;
-            } else if (b=='s') {
-              state = stateEnum.endstream_s;
+            //////} else if (b=='s') {
+            //////  state = stateEnum.endstream_s;
             } else {
               state = stateEnum.parse;
             }
@@ -298,58 +321,58 @@ namespace PdfParserLib {
             state = stateEnum.parse;
             break;
 
-          case stateEnum.endstream_s:
-            if (b=='t') {
-              state = stateEnum.endstream_t;
-            } else {
-              state = stateEnum.parse;
-            }
-            break;
+          //////case stateEnum.endstream_s:
+          //////  if (b=='t') {
+          //////    state = stateEnum.endstream_t;
+          //////  } else {
+          //////    state = stateEnum.parse;
+          //////  }
+          //////  break;
 
-          case stateEnum.endstream_t:
-            if (b=='r') {
-              state = stateEnum.endstream_r;
-            } else {
-              state = stateEnum.parse;
-            }
-            break;
+          //////case stateEnum.endstream_t:
+          //////  if (b=='r') {
+          //////    state = stateEnum.endstream_r;
+          //////  } else {
+          //////    state = stateEnum.parse;
+          //////  }
+          //////  break;
 
-          case stateEnum.endstream_r:
-            if (b=='e') {
-              state = stateEnum.endstream_e;
-            } else {
-              state = stateEnum.parse;
-            }
-            break;
+          //////case stateEnum.endstream_r:
+          //////  if (b=='e') {
+          //////    state = stateEnum.endstream_e;
+          //////  } else {
+          //////    state = stateEnum.parse;
+          //////  }
+          //////  break;
 
-          case stateEnum.endstream_e:
-            if (b=='a') {
-              state = stateEnum.endstream_a;
-            } else {
-              state = stateEnum.parse;
-            }
-            break;
+          //////case stateEnum.endstream_e:
+          //////  if (b=='a') {
+          //////    state = stateEnum.endstream_a;
+          //////  } else {
+          //////    state = stateEnum.parse;
+          //////  }
+          //////  break;
 
-          case stateEnum.endstream_a:
-            if (b=='m') {
-              startIndex = bytesIndex - 9;
-              //paragraph.Inlines.Add(new PdfStreamRun(objectObjectId!.Value, this));
-              //var streamToken = (DictionaryToken)tokeniser.GetToken(objectObjectId!.Value)!;
-              //if (streamToken is DictionaryToken streamDictionaryToken && streamDictionaryToken.Type=="XRef") {
-              //  if (streamDictionaryToken.PdfObject is string xRefString) {
-              //    paragraph.Inlines.Add(new Run(Environment.NewLine + "XRef stream content:" + Environment.NewLine + xRefString));
-              //  }
-              //}
-              //var streamToken = (DictionaryToken)tokeniser.GetToken(objectObjectId!.Value)!;
-              //if (streamToken is DictionaryToken streamDictionaryToken && streamDictionaryToken.Type=="XRef") {
-              //  if (streamDictionaryToken.PdfObject is string xRefString) {
-              //    System.Diagnostics.Debugger.Break();
-              //  }
-              //}
+          //////case stateEnum.endstream_a:
+          //////  if (b=='m') {
+          //////    startIndex = bytesIndex - 9;
+          //////    //paragraph.Inlines.Add(new PdfStreamRun(objectObjectId!.Value, this));
+          //////    //var streamToken = (DictionaryToken)tokeniser.GetToken(objectObjectId!.Value)!;
+          //////    //if (streamToken is DictionaryToken streamDictionaryToken && streamDictionaryToken.Type=="XRef") {
+          //////    //  if (streamDictionaryToken.PdfObject is string xRefString) {
+          //////    //    paragraph.Inlines.Add(new Run(Environment.NewLine + "XRef stream content:" + Environment.NewLine + xRefString));
+          //////    //  }
+          //////    //}
+          //////    //var streamToken = (DictionaryToken)tokeniser.GetToken(objectObjectId!.Value)!;
+          //////    //if (streamToken is DictionaryToken streamDictionaryToken && streamDictionaryToken.Type=="XRef") {
+          //////    //  if (streamDictionaryToken.PdfObject is string xRefString) {
+          //////    //    System.Diagnostics.Debugger.Break();
+          //////    //  }
+          //////    //}
 
-            }
-            state = stateEnum.parse;
-            break;
+          //////  }
+          //////  state = stateEnum.parse;
+          //////  break;
 
           default:
             throw new NotSupportedException();
@@ -374,7 +397,9 @@ namespace PdfParserLib {
         return null;
 
       } catch (Exception ex) {
-        return ex.ToDetailString();
+        return ex;
+        //return ex.ToDetailString() + Environment.NewLine + Environment.NewLine + 
+        //  textStore.ToString(0, textStore.LinesCount) + Environment.NewLine + "<<<exception location>>>";
       }
     }
   }

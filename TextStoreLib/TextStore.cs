@@ -11,8 +11,8 @@ namespace PdfParserLib {
   /// <summary>
   /// Stores large text read from a pdf file as bytes in a reusable character array chars. LineStarts stores where each line 
   /// starts.<br/>
-  /// Acording to the pdf specification, end of line is marked with a single CR, single LF or a CR LF pair. In chars, each EOl
-  /// is stored as a CR.
+  /// Acording to the pdf specification, end of line is marked with a single CR, single LF or a CR LF pair in a pdf document. In 
+  /// chars, each EOL is stored as a CR.
   /// </summary>
   public class TextStore {
 
@@ -46,7 +46,7 @@ namespace PdfParserLib {
         var startIndex = LineStarts[index];
         var endCharIndex = LineStarts[index+1];  
         if (startIndex==endCharIndex) {
-          //very last line is empty, has not CR
+          //very last line is empty, has no CR
           return new ReadOnlySpan<char>(chars, startIndex, 0);
         }
         endCharIndex--;//remove CR at end.
@@ -132,6 +132,47 @@ namespace PdfParserLib {
                                                           //it makes sense to assign more space
       }
       LineStarts[linesCount] = charsCount;//it makes reading chars easier if even chars[linesCount] has a value
+    }
+
+
+    public void AppendError(string title, string message) {
+      if (charsCount + title.Length + message.Length + 100 >chars.Length) {
+        //ensure there is plenty of space
+        Array.Resize(ref chars, chars.Length*2);
+      }
+      if (linesCount+10>=LineStarts.Length) {
+        Array.Resize(ref LineStarts, LineStarts.Length*2);
+      }
+
+      chars[charsCount++] = '\r';
+      LineStarts[linesCount++] = charsCount;
+      chars[charsCount++] = '\r';
+      LineStarts[linesCount++] = charsCount;
+      chars[charsCount++] = '{';
+      chars[charsCount++] = 'e';
+      foreach (var c in title) {
+        chars[charsCount++] = c;
+      }
+      chars[charsCount++] = '}';
+      chars[charsCount++] = '\r';
+      LineStarts[linesCount++] = charsCount;
+
+      foreach (var c in message) {
+        if (c=='\n') continue;//skip line feeds
+
+        chars[charsCount++] = c;
+        if (c=='\r') {//carriage return separated 2 lines
+          if (linesCount>=LineStarts.Length) {
+            Array.Resize(ref LineStarts, LineStarts.Length*2);
+          }
+          LineStarts[linesCount++] = charsCount;
+        }
+      }
+      chars[charsCount++] = '\r';
+      if (linesCount>=LineStarts.Length) {
+        Array.Resize(ref LineStarts, LineStarts.Length*2);
+      }
+      LineStarts[linesCount] = charsCount;//do not increment linesCount, LineStarts needs an entry for linesCount
     }
 
 
@@ -371,7 +412,7 @@ namespace PdfParserLib {
         var nextLine = lineIndex + 1;
         //var endChar = nextLine<linesCount ? LineStarts[nextLine] : charsCount;
         var endChar = LineStarts[nextLine];
-        stringBuilder.Append(chars.AsSpan(startChar, endChar-startChar));
+        stringBuilder.Append(chars.AsSpan(startChar, endChar-startChar-1));//do not include carriage return
         stringBuilder.AppendLine();
       }
       return stringBuilder.ToString();
