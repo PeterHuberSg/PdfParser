@@ -264,6 +264,7 @@ namespace PdfParserLib {
         {"f_f",'ﬀ' },
         {"T_h",'ᵺ' },
         {"blank",' ' },
+        {"f_f_i",'ﬃ' },
         {"AEsmall",'æ' },
         {"Aacutesmall",'á' },
         {"Acircumflexsmall",'â' },

@@ -73,7 +73,9 @@ namespace PdfFilesTextBrowser {
       //FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202104.pdf";
       //FileTextBox.Text = @"D:\PDF32000_2008.pdf";
       //FileTextBox.Text = @"D:\Abmelung Horgen.pdf";
-      FileTextBox.Text = @"D:\comparison-of-private-hospital-ips.pdf";
+      //FileTextBox.Text = @"D:\comparison-of-private-hospital-ips.pdf";
+      FileTextBox.Text = @"D:\HortPark and Southern Ridges.pdf";
+    
     
 
       //xref stream

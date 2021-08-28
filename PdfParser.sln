@@ -18,6 +18,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 		.editorconfig.inferred = .editorconfig.inferred
 		CopyRight.MD = CopyRight.MD
+		PdfFileFormat.md = PdfFileFormat.md
 		PdfParser Design.docx = PdfParser Design.docx
 		PdfParser Design.pptx = PdfParser Design.pptx
 		README.md = README.md
@@ -27,7 +28,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CustomControlBaseLib", "..\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TextStoreLib", "TextStoreLib\TextStoreLib.csproj", "{BCAFE822-1FA5-4DCE-9E0D-B722FF240FF8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextStoreLibTest", "TextStoreLibTest\TextStoreLibTest.csproj", "{F2153872-4290-4942-B94D-5BBE0EB2403F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TextStoreLibTest", "TextStoreLibTest\TextStoreLibTest.csproj", "{F2153872-4290-4942-B94D-5BBE0EB2403F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

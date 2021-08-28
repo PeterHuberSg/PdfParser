@@ -1549,7 +1549,8 @@ a9;2720";
       sb.AppendLine($"        {{\"f_i\",'ﬁ' }},"); //PDF32000_2008.pdf
       sb.AppendLine($"        {{\"f_f\",'ﬀ' }},"); //PDF32000_2008.pdf
       sb.AppendLine($"        {{\"T_h\",'ᵺ' }},"); //PDF32000_2008.pdf
-      sb.AppendLine($"        {{\"blank\",' ' }},"); 
+      sb.AppendLine($"        {{\"blank\",' ' }},");
+      sb.AppendLine($"        {{\"f_f_i\",'ﬃ' }},"); //D:\HortPark and Southern Ridges.pdf
 
       //d4_MacExpertEncodingCharacterSet
       lines = d4_MacExpertEncodingCharacterSet.Split(Environment.NewLine);
