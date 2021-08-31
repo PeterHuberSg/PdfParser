@@ -52,7 +52,7 @@ namespace PdfFilesTextBrowser {
       Current = this;
       bytesTextViwer = new(this);
 
-      //DirectoryTextBox.Text = @"D:\";
+      DirectoryTextBox.Text = @"D:\";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\Invest\CS";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\Invest\DBS";
@@ -74,9 +74,9 @@ namespace PdfFilesTextBrowser {
       //FileTextBox.Text = @"D:\PDF32000_2008.pdf";
       //FileTextBox.Text = @"D:\Abmelung Horgen.pdf";
       //FileTextBox.Text = @"D:\comparison-of-private-hospital-ips.pdf";
-      FileTextBox.Text = @"D:\HortPark and Southern Ridges.pdf";
-    
-    
+      //FileTextBox.Text = @"D:\HortPark and Southern Ridges.pdf";
+
+
 
       //xref stream
 
