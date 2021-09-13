@@ -11,26 +11,32 @@ using System.Windows.Media;
 namespace PdfFilesTextBrowser {
 
 
-  public class DisplayLines {
-    public readonly int StartAbsoluteLine;
+  /// <summary>
+  /// Inidicates which lines of the pdf document should be displayed in the TextViewer
+  /// </summary>
+  public class ViewLines {
+    public readonly int StartDocuLine;
     public readonly int LinesCount;
-    public readonly int EndAbsoluteLine;
+    public readonly int EndDocuLine;
 
-    public DisplayLines(int startAbsoluteLine, int linesCount) {
+    public ViewLines(int startDocuLine, int linesCount) {
       if (linesCount<=0) throw new ArgumentException();
 
-      StartAbsoluteLine = startAbsoluteLine;
+      StartDocuLine = startDocuLine;
       LinesCount = linesCount;
-      EndAbsoluteLine = startAbsoluteLine + linesCount;
+      EndDocuLine = startDocuLine + linesCount;
     }
 
     public override string ToString() {
-      return $"StartAbsoluteLine: {StartAbsoluteLine}; EndAbsoluteLine: {EndAbsoluteLine};";
+      return $"StartDocuLine: {StartDocuLine}; EndDocuLine: {EndDocuLine};";
     }
   }
 
 
 
+  /// <summary>
+  /// Displays AdrLabels and the text of a pdf file in the TextViewer window.
+  /// </summary>
   public class TextViewerGlyph: CustomControlBase {
 
     #region Properties
@@ -39,29 +45,35 @@ namespace PdfFilesTextBrowser {
     /// <summary>
     /// First and last line to get displayed
     /// </summary>
-    public DisplayLines? DisplayLines { get; private set; }
+    public ViewLines? ViewLines { get; private set; }
 
 
     /// <summary>
-    /// Width of longest line found in document
+    /// Width of longest line found in document, incl. BorderX and AdrLabelWidth
     /// </summary>
-    public double MaxLineWidth { get; private set;}
+    public double MaxDocuLineWidth { get; private set;}
 
 
     /// <summary>
-    /// xOffset of first character to be displayed
+    /// number of x pixels needed to display empty border pixels and 'pdf file byte offset' before the actual text
     /// </summary>
-    public double XOffset { get; private set;}
+    public double TextStartDocuX { get; private set; }
 
 
     /// <summary>
-    /// Contains width for every character on a displayed line. A character has the width 0 when it is a formatting character. 
+    /// xOffset of first pixel to be displayed based on horizontal scrollbar value
+    /// </summary>
+    public double ScrollViewX { get; private set;}
+
+
+    /// <summary>
+    /// Contains width for every character on a displayed text line. A character has the width 0 when it is a formatting character. 
     /// </summary>
     public IReadOnlyList<double> DisplayedGlyphWidths => displayedGlyphWidths;
 
 
     /// <summary>
-    /// Next byte is a formatting control character
+    /// Indicates that next byte is a formatting control character
     /// </summary>
     public const byte StartFormat = (byte)'{';
 
@@ -73,13 +85,13 @@ namespace PdfFilesTextBrowser {
 
 
     /// <summary>
-    /// Next character ends formatting instruction
+    /// Replacement for characters which cannot be displayed in a certain font
     /// </summary>
     public const char ErrorChar = '¿';
 
 
     /// <summary>
-    /// Contains the measurement information of normal font and (not bold)
+    /// Contains the measurement information of normal (not bold) font
     /// </summary>
     public GlyphTypeface GlyphTypefaceNormal {
       get { return glyphTypefaceNormal; }
@@ -105,7 +117,7 @@ namespace PdfFilesTextBrowser {
     /// <summary>
     /// offset from left border before first character gets written
     /// </summary>
-    public const int BorderX = 3;
+    public const int ViewBorderX = 3;
     #endregion
 
 
@@ -128,37 +140,34 @@ namespace PdfFilesTextBrowser {
     //      -------
 
     public void Reset() {
-      DisplayLines = null;
-      MaxLineWidth = 0;
-      XOffset = 0;
-      MaxLineWidth = 0;
+      ViewLines = null;
+      MaxDocuLineWidth = 0;
+      ScrollViewX = 0;
     }
 
 
-    public void SetDisplayLines(DisplayLines displayLines) {
-      if (DisplayLines is null ||
-        DisplayLines.StartAbsoluteLine!=displayLines.StartAbsoluteLine || 
-        DisplayLines.LinesCount!=displayLines.LinesCount) 
+    public void SetViewLines(ViewLines viewLines) {
+      if (ViewLines is null ||
+        ViewLines.StartDocuLine!=viewLines.StartDocuLine || 
+        ViewLines.LinesCount!=viewLines.LinesCount) 
       {
-        DisplayLines = displayLines;
-        //textViewer.LogLine($"Glyph.SetDisplayLines {DisplayLines}");
+        ViewLines = viewLines;
+        //textViewer.LogLine($"Glyph.SetViewLines {viewLines}");
         InvalidateVisual();
       }
     }
 
 
-    public void SetXOffset(double xOffset) {
-      if (XOffset!=xOffset) {
-        XOffset = xOffset;
-        //textViewer.LogLine($"Glyph.SetXOffset {xOffset:F0}");
+    /// <summary>
+    /// Sets the x address of leftmost pixel to be displayed
+    /// </summary>
+    public void SetScrollViewX(double scrollViewX) {
+      if (ScrollViewX!=scrollViewX) {
+        ScrollViewX = scrollViewX;
+        //textViewer.LogLine($"Glyph.SetScrollViewX {scrollViewX:F0}");
         InvalidateVisual();
       }
     }
-
-
-    //public void ResetMaxLineWidth() {
-    //  MaxLineWidth = 0;
-    //}
 
 
     TextViewerAnchor? markAnchor;
@@ -169,10 +178,13 @@ namespace PdfFilesTextBrowser {
     }
 
 
-    public double GetStartX(TextStoreSelection selection) {
+    /// <summary>
+    /// Returns the pixel offset of the selection relative to the first text character
+    /// </summary>
+    public double GetTextX(TextStoreSelection selection) {
       var textStore = textViewer.TextStore;
       var chars = textStore.Chars;
-      var charsIndex = textViewer.TextStore.LineStarts[selection.StartLine];
+      //var charsIndex = textViewer.TextStore.LineStarts[selection.StartLine];
       var glyphTypeface = glyphTypefaceNormal;
       var x = 0.0;
       var isStartFormatFound = false;
@@ -231,41 +243,69 @@ namespace PdfFilesTextBrowser {
     Typeface typefaceBold;
 
 
+    /*
+    Values for horizontal line:
+    ---------------------------
+
+                1234567   obj 1 0              //Sample text
+    |BorderX | AdrLabel | Text            |
+    |<----------MaxDocuLineWidth--------->|
+    |<------hSbar.Max----->|<-hSbar.Page->|
+    |<-hSBar.Value->|                          //ScrollXOffset
+
+    View pixel address of first text character:
+    |<-hSBar.Value->|                          //ScrollXOffset
+                    ╔════════════════════╗
+                    ║|<-viewX->|         ║     //view
+                    ╚════════════════════╝
+    */
+
+
     protected override void OnRenderContent(DrawingContext drawingContext, Size renderContentSize) {
-      if (DisplayLines is null) return;
+      if (ViewLines is null) return;
 
       if (typefaceNormal is null) {
+        //first time OnRender is called, initialise fonts
         typefaceNormal = new Typeface(FontFamily, FontStyle, FontWeights.Normal, FontStretch);
         if (!typefaceNormal.TryGetGlyphTypeface(out glyphTypefaceNormal))
-          throw new InvalidOperationException("No plain GlyphTypeface found");
+          throw new InvalidOperationException($"No plain GlyphTypeface found for {FontFamily.Source}.");
 
         typefaceBold = new Typeface(FontFamily, FontStyle, FontWeights.Bold, FontStretch);
         if (!typefaceBold.TryGetGlyphTypeface(out glyphTypefaceBold))
-          throw new InvalidOperationException("No plain GlyphTypeface found");
+          throw new InvalidOperationException("No bold GlyphTypeface found for {FontFamily.Source}.");
 
         PixelsPerDip = (float)VisualTreeHelper.GetDpi(this).PixelsPerDip;
       }
 
-      textViewer.TextViewerObjects.Reset(DisplayLines.StartAbsoluteLine);
+      textViewer.TextViewerObjects.Reset(ViewLines.StartDocuLine);
       displayedGlyphWidths.Clear();
-      var lineOffset = FontSize;
-      var lastDisplayedAbsoluteLineIndex = Math.Min(DisplayLines.EndAbsoluteLine, textViewer.TextStore.LinesCount);
+      var viewLineY = FontSize;
+      var lastDisplayedDocuLineIndex = Math.Min(ViewLines.EndDocuLine, textViewer.TextStore.LinesCount);
       //textViewer.LogLine1($"Glyph.OnRenderContent DisplayLines: '{DisplayLines}'; " +
-      //  $"lastDisplayedAbsoluteLineIndex: {lastDisplayedAbsoluteLineIndex}; XOffset: {XOffset:F0}");
+      //  $"lastDisplayedDocuLineIndex: {lastDisplayedDocuLineIndex}; XOffset: {XOffset:F0}");
       var hasMaxLineWidthChanged = false;
-      for (int displayedAbsoluteLineIndex = DisplayLines.StartAbsoluteLine; displayedAbsoluteLineIndex < lastDisplayedAbsoluteLineIndex; displayedAbsoluteLineIndex++) {
-        var lineWidth = writeLine(drawingContext, new Point(BorderX, lineOffset), FontSize, displayedAbsoluteLineIndex);
-        lineOffset += FontSize;
-        if (MaxLineWidth<lineWidth) {
-          MaxLineWidth = lineWidth;
+
+      //calculate width of address label (displaying byte offset from start of pdf file)
+      var adrLabelDigitCount = textViewer.TextStore.CharsCount.ToString().Length;
+      glyphTypefaceNormal.CharacterToGlyphMap.TryGetValue('0', out var glyphIndex);
+      double digitWidth = glyphTypefaceNormal.AdvanceWidths[glyphIndex] * FontSize;
+      var adrLabelEndDocuX = ViewBorderX + adrLabelDigitCount*digitWidth;
+      TextStartDocuX = adrLabelEndDocuX + digitWidth;
+
+      for (int displayedDocuLineIndex = ViewLines.StartDocuLine; displayedDocuLineIndex < lastDisplayedDocuLineIndex; displayedDocuLineIndex++) {
+        var textWidth = writeLine(drawingContext, viewLineY, FontSize, displayedDocuLineIndex, adrLabelEndDocuX);
+        var lineWidth = TextStartDocuX + textWidth;
+        if (MaxDocuLineWidth<lineWidth) {
+          MaxDocuLineWidth = lineWidth;
           hasMaxLineWidthChanged = true;
         }
+        viewLineY += FontSize;
       }
       //SetMarker(null);
       if (hasMaxLineWidthChanged) {
         maxLineWidthChanged();
       }
-      textViewer.TextViewerSelection.SetDisplayRegion(DisplayLines, XOffset);
+      textViewer.TextViewerSelection.SetDisplayRegion(ViewLines, ScrollViewX, TextStartDocuX);
       //textViewer.LogLine("Glyph => textViewer.UpdateMouseCursorAndSelection()");
       textViewer.UpdateMouseCursorAndSelection();
     }
@@ -276,12 +316,45 @@ namespace PdfFilesTextBrowser {
     readonly List<double> displayedGlyphWidths = new();//width of every displayed char from TextStore. Characters which are
                                                        //part of formatting instructions have width 0 (they don't get displayed)
 
-
     /// <summary>
-    /// Writes the string of 1 line to a DrawingContext
+    /// Writes the text of 1 line to the DrawingContext, returns the lenght of text in pixels
     /// </summary>
-    private double writeLine(DrawingContext drawingContext, Point origin, double fontSize, int displayedAbsoluteLineIndex) {
-      ReadOnlySpan<char> text = textViewer.TextStore[displayedAbsoluteLineIndex];
+    private double writeLine(
+      DrawingContext drawingContext, 
+      double viewLineY, 
+      double fontSize, 
+      int docuLine, 
+      double adrLabelEndDocuX) 
+    {
+      double glyphRunWidth;
+      var isLineStartFound = false;
+      if (adrLabelEndDocuX>ScrollViewX) {
+        //write pdf file byte offset before actual text
+        glyphIndexes.Clear();
+        glyphRunGlyphWidths.Clear();
+        glyphRunWidth = 0;
+        var adrLabelString = textViewer.TextStore.LineByteOffsets[docuLine].ToString();
+        foreach (var ch in adrLabelString) {
+          //addGlyph(ch, glyphTypefaceNormal, fontSize, ref glyphRunWidth, ref lineWidth, ref isLineStartFound, ref xOffset);
+          if (!glyphTypefaceNormal.CharacterToGlyphMap.TryGetValue(ch, out var glyphIndex)) {
+            glyphIndex = glyphTypefaceNormal.CharacterToGlyphMap[ErrorChar];
+          };
+          double width = glyphTypefaceNormal.AdvanceWidths[glyphIndex] * fontSize;
+          glyphRunWidth += width;
+
+          glyphIndexes.Add(glyphIndex);
+          glyphRunGlyphWidths.Add(width);
+        }
+
+        //write line address (offset from start of pdf file in bytes) right aligned
+        var adrLabelPoint = new Point(adrLabelEndDocuX - glyphRunWidth - ScrollViewX, viewLineY);
+        GlyphRun glyphRun = new GlyphRun(glyphTypefaceNormal, 0, false, fontSize, PixelsPerDip, glyphIndexes.ToArray(), adrLabelPoint,
+          glyphRunGlyphWidths.ToArray(), null, null, null, null, null, null);
+        drawingContext.DrawGlyphRun(Brushes.Gray, glyphRun);
+      }
+
+      //write actual text
+      ReadOnlySpan<char> text = textViewer.TextStore[docuLine];
       if (text.Length==0) {
         displayedGlyphWidths.Add(0);//for CR for empty line
         return 0;
@@ -297,13 +370,11 @@ namespace PdfFilesTextBrowser {
       var isUnderline = false;
       glyphIndexes.Clear();
       glyphRunGlyphWidths.Clear();
-      double glyphRunWidth = 0;
-      bool isLineStartFound = false;
-      double xOffset = -XOffset;
-      double lineWidth = 0;
+      glyphRunWidth = 0;
+      var viewX = TextStartDocuX - ScrollViewX;
+      var textWidth = 0.0;
 
       for (int charIndex = 0; charIndex<text.Length; charIndex++) {
-
         //convert 1 or 2 chars into CodePoint
         int codePoint = text[charIndex];
         int nextCodePoint;
@@ -354,8 +425,8 @@ namespace PdfFilesTextBrowser {
                 stringBuilder.Clear();
               }
               codePoint = int.MinValue;
-              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin, 
-                isLineStartFound, xOffset, drawingContext);
+              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref viewX, viewLineY,
+                isLineStartFound, drawingContext);
               glyphTypeface = glyphTypefaceBold;
               brush = Brushes.Black;
               isUnderline = false;
@@ -365,8 +436,8 @@ namespace PdfFilesTextBrowser {
               isUnFormatted = false;
               displayedGlyphWidths.Add(0);
               codePoint = int.MinValue;
-              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin, 
-                isLineStartFound, xOffset, drawingContext);
+              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref viewX, viewLineY, 
+                isLineStartFound, drawingContext);
               glyphTypeface = glyphTypefaceNormal;
               brush = Brushes.Blue;
               isUnderline = false;
@@ -376,8 +447,8 @@ namespace PdfFilesTextBrowser {
               isUnFormatted = false;
               displayedGlyphWidths.Add(0);
               codePoint = int.MinValue;
-              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin, 
-                isLineStartFound, xOffset, drawingContext);
+              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref viewX, viewLineY,
+                isLineStartFound, drawingContext);
               glyphTypeface = glyphTypefaceBold;
               brush = Brushes.Black;
               isUnderline = false;
@@ -387,8 +458,8 @@ namespace PdfFilesTextBrowser {
               isUnFormatted = false;
               displayedGlyphWidths.Add(0);
               codePoint = int.MinValue;
-              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin,
-                isLineStartFound, xOffset, drawingContext);
+              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref viewX, viewLineY,
+                isLineStartFound, drawingContext);
               glyphTypeface = glyphTypefaceBold;
               brush = Brushes.DarkRed;
               isUnderline = false;
@@ -400,8 +471,8 @@ namespace PdfFilesTextBrowser {
               isLink = true;
               stringBuilder.Clear();
               codePoint = int.MinValue;
-              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin, 
-                isLineStartFound, xOffset, drawingContext);
+              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref viewX, viewLineY,
+                isLineStartFound, drawingContext);
               glyphTypeface = glyphTypefaceBold;
               brush = Brushes.Blue;
               isUnderline = true;
@@ -413,8 +484,8 @@ namespace PdfFilesTextBrowser {
               isStream = true;
               stringBuilder.Clear();
               codePoint = int.MinValue;
-              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin, 
-                isLineStartFound, xOffset, drawingContext);
+              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref viewX, viewLineY,
+                isLineStartFound, drawingContext);
               glyphTypeface = glyphTypefaceBold;
               brush = Brushes.Green;
               isUnderline = true;
@@ -424,8 +495,8 @@ namespace PdfFilesTextBrowser {
               isUnFormatted = false;
               displayedGlyphWidths.Add(0);
               codePoint = int.MinValue;
-              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin,
-                isLineStartFound, xOffset, drawingContext);
+              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref viewX, viewLineY,
+                isLineStartFound, drawingContext);
               glyphTypeface = glyphTypefaceNormal;
               brush = Brushes.Black;
               isUnderline = true;
@@ -434,8 +505,8 @@ namespace PdfFilesTextBrowser {
             default:
               //unknown formatting character found
               //System.Diagnostics.Debugger.Break();
-              addGlyph(StartFormat, glyphTypeface, fontSize, ref glyphRunWidth, ref lineWidth, ref isLineStartFound, ref xOffset);
-              addGlyph(nextCodePoint, glyphTypeface, fontSize, ref glyphRunWidth, ref lineWidth, ref isLineStartFound, ref xOffset);
+              addGlyph(StartFormat, glyphTypeface, fontSize, ref glyphRunWidth, ref textWidth, ref isLineStartFound, ref viewX);
+              addGlyph(nextCodePoint, glyphTypeface, fontSize, ref glyphRunWidth, ref textWidth, ref isLineStartFound, ref viewX);
               codePoint = ErrorChar;
               break;
             }
@@ -449,7 +520,7 @@ namespace PdfFilesTextBrowser {
             } else {
               //single '}' found, but there is no start format, just draw it and the following glyph.
               //if the nextCodePoint is a '{', it will not be used as start format. Easier code
-              addGlyph(EndFormat, glyphTypeface, fontSize, ref glyphRunWidth, ref lineWidth, ref isLineStartFound, ref xOffset);
+              addGlyph(EndFormat, glyphTypeface, fontSize, ref glyphRunWidth, ref textWidth, ref isLineStartFound, ref viewX);
               codePoint = nextCodePoint;
             }
           }
@@ -466,7 +537,7 @@ namespace PdfFilesTextBrowser {
             } else {
               //single '{', draw it with next glyph
               //System.Diagnostics.Debugger.Break();
-              addGlyph(StartFormat, glyphTypeface, fontSize, ref glyphRunWidth, ref lineWidth, ref isLineStartFound, ref xOffset);
+              addGlyph(StartFormat, glyphTypeface, fontSize, ref glyphRunWidth, ref textWidth, ref isLineStartFound, ref viewX);
               codePoint = nextCodePoint;
             }
 
@@ -483,22 +554,34 @@ namespace PdfFilesTextBrowser {
                 var name = stringBuilder.ToString();
                 if (textViewer.Anchors.TryGetValue(name, out var anchor)) {
                   if (anchor==markAnchor) {
+                    //drawingContext.DrawRectangle(Brushes.LightGreen, null,
+                    //  new Rect(
+                    //    origin.X + Math.Max(0, AdrLabelWidth - ScreenXOffset),
+                    //    origin.Y - fontSize + textViewer.TextViewerSelection.GlyphYOffset,
+                    //    glyphRunWidth, fontSize));
+                    drawingContext.DrawRectangle(Brushes.Black, null, new Rect(0, docuLine - fontSize, 100, docuLine - fontSize - 100));
                     drawingContext.DrawRectangle(Brushes.LightGreen, null,
-                      new Rect(origin.X, origin.Y - fontSize + textViewer.TextViewerSelection.GlyphYOffset, glyphRunWidth, fontSize));
+                      new Rect(
+                        viewX,
+                        viewLineY - fontSize + textViewer.SelectionYOffset,
+                        glyphRunWidth, fontSize));
                   }
                 }
 
               } else if (isLink) {
                 var objectIdString = stringBuilder.ToString();
                 if (textViewer.Anchors.TryGetValue(objectIdString, out var anchor)) {
-                  textViewer.TextViewerObjects.AddLink(anchor, displayedAbsoluteLineIndex, origin.X, origin.X + glyphRunWidth);
+                  var docuX = viewX - TextStartDocuX + ScrollViewX;
+                  textViewer.TextViewerObjects.AddLink(anchor, docuLine, docuX, docuX + glyphRunWidth);
                 } else {
                   //System.Diagnostics.Debugger.Break(); //anchors are not available when an exception occured
                 }
 
               } else if (isStream) {
                 var objectIdString = stringBuilder.ToString();
-                textViewer.TextViewerObjects.AddStream(new ObjectId(objectIdString), displayedAbsoluteLineIndex, origin.X, origin.X + glyphRunWidth);
+                //textViewer.TextViewerObjects.AddStream(new ObjectId(objectIdString), displayedDocuLineIndex, origin.X, origin.X + glyphRunWidth);
+                var docuX = viewX - TextStartDocuX + ScrollViewX;
+                textViewer.TextViewerObjects.AddStream(new ObjectId(objectIdString), docuLine, docuX, docuX + glyphRunWidth);
               }
 
               if (!isNextCodePoint) {
@@ -506,8 +589,8 @@ namespace PdfFilesTextBrowser {
                 break;
               }
 
-              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin, 
-                isLineStartFound, xOffset, drawingContext);
+              drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref viewX, viewLineY,
+               isLineStartFound, drawingContext);
               isUnFormatted = true;
               if (nextCodePoint==StartFormat) {
                 //already start of next format. Process '{' once more
@@ -532,12 +615,12 @@ namespace PdfFilesTextBrowser {
         }
 
         //concatenate glyphs with the same format
-        addGlyph(codePoint, glyphTypeface, fontSize, ref glyphRunWidth, ref lineWidth, ref isLineStartFound, ref xOffset);
+        addGlyph(codePoint, glyphTypeface, fontSize, ref glyphRunWidth, ref textWidth, ref isLineStartFound, ref viewX);
       }
-      drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref origin, 
-        isLineStartFound, xOffset, drawingContext);
+      drawGlyphRun(glyphTypeface, brush, isUnderline, fontSize, ref glyphRunWidth, ref viewX, viewLineY,
+        isLineStartFound, drawingContext);
       displayedGlyphWidths.Add(0);//for CR at the end of line
-      return lineWidth;
+      return textWidth;
     }
 
 
@@ -554,30 +637,20 @@ namespace PdfFilesTextBrowser {
 
 
     private void addGlyph(int codePoint, GlyphTypeface glyphTypeface, double size, ref double glyphRunWidth, 
-      ref double lineWidth, ref bool isLineStartFound, ref double xOffset) 
+      ref double textWidth, ref bool isLineStartFound, ref double viewX) 
     {
-      //if (codePoint>=0) {
-      //  if (!glyphTypeface.CharacterToGlyphMap.TryGetValue(codePoint, out var glyphIndex)) {
-      //    glyphIndex = glyphTypeface.CharacterToGlyphMap[ErrorChar];
-      //  };
-      //  glyphIndexes.Add(glyphIndex);
-      //  double width = glyphTypeface.AdvanceWidths[glyphIndex] * size;
-      //  glyphRunGlyphWidths.Add(width);
-      //  displayedGlyphWidths.Add(width);
-      //  glyphRunWidth += width;
-      //}
       if (codePoint>=0) {
         if (!glyphTypeface.CharacterToGlyphMap.TryGetValue(codePoint, out var glyphIndex)) {
           glyphIndex = glyphTypeface.CharacterToGlyphMap[ErrorChar];
         };
         double width = glyphTypeface.AdvanceWidths[glyphIndex] * size;
         displayedGlyphWidths.Add(width);
-        lineWidth += width;
+        textWidth += width;
         if (!isLineStartFound) {
-          xOffset += width;
-          if (xOffset>0) {
+          viewX += width;
+          if (viewX>0) {
             isLineStartFound = true;
-            xOffset -= width;
+            viewX -= width;
           }
         }
         if (isLineStartFound) {
@@ -594,36 +667,35 @@ namespace PdfFilesTextBrowser {
       GlyphTypeface glyphTypeface,
       Brush brush,
       bool isUnderline,
-      double size,
+      double fontSize,
       ref double glyphRunWidth,
-      ref Point origin,
+      ref double viewX,
+      double viewLineY,
       bool isLineStartFound, 
-      double xOffset,
       DrawingContext drawingContext) 
     {
       if (glyphIndexes.Count==0 || !isLineStartFound) return;
 
-      var adjustedOrigin = new Point(origin.X + xOffset, origin.Y);
-      GlyphRun glyphRun = new GlyphRun(glyphTypeface, 0, false, size, PixelsPerDip, glyphIndexes.ToArray(), adjustedOrigin,
-        glyphRunGlyphWidths.ToArray(), null, null, null, null, null, null);
+      GlyphRun glyphRun = new GlyphRun(glyphTypeface, 0, false, fontSize, PixelsPerDip, glyphIndexes.ToArray(), 
+        new Point(viewX, viewLineY), glyphRunGlyphWidths.ToArray(), null, null, null, null, null, null);
       drawingContext.DrawGlyphRun(brush, glyphRun);
 
       if (isUnderline) {
-        double underlineHeight = glyphTypeface.UnderlineThickness * size * 2;//times 2 because it looks too thin
-        var underlineY = adjustedOrigin.Y + underlineHeight;
+        var underlineHeight = glyphTypeface.UnderlineThickness * fontSize * 2;//times 2 because it looks too thin
+        var underlineY = viewLineY + underlineHeight;
         var guidelines = new GuidelineSet();
         guidelines.GuidelinesY.Add(underlineY);
         guidelines.GuidelinesY.Add(underlineY + underlineHeight);
         drawingContext.PushGuidelineSet(guidelines);
         try {
-          drawingContext.DrawRectangle(brush, pen: null, new Rect(adjustedOrigin.X, underlineY, glyphRunWidth, underlineHeight));
+          drawingContext.DrawRectangle(brush, pen: null, new Rect(viewX, underlineY, glyphRunWidth, underlineHeight));
         } finally {
           drawingContext.Pop();
         }
       }
       glyphIndexes.Clear();
       glyphRunGlyphWidths.Clear();
-      origin = new Point(origin.X + glyphRunWidth, origin.Y);
+      viewX += glyphRunWidth;
       glyphRunWidth = 0;
     }
     #endregion

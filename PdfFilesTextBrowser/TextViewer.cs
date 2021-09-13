@@ -13,7 +13,10 @@ using System.Windows.Media;
 
 namespace PdfFilesTextBrowser {
 
-
+  /// <summary>
+  /// Displays the content of a pdf file, stored in a TextStore and shows for each line its byte offset from the start of
+  /// the pdf file (=AdrLabels).
+  /// </summary>
   public class TextViewer: CustomControlBase {
 
     #region Properties
@@ -28,7 +31,7 @@ namespace PdfFilesTextBrowser {
     public int LinesPerPage { get; private set; }
     
     
-    public IReadOnlyList<double> DisplayedGlyphWidths => textViewerGlyph.DisplayedGlyphWidths;
+    public IReadOnlyList<double> DisplayedGlyphWidths => TextViewerGlyph.DisplayedGlyphWidths;
 
 
     public IReadOnlyDictionary<string, TextViewerAnchor> Anchors { get { return anchors; } }
@@ -40,7 +43,16 @@ namespace PdfFilesTextBrowser {
     public readonly TextViewerObjects TextViewerObjects = new();
 
 
+    /// <summary>
+    /// vertical pixel offset from start of font to start of displayed selection rectangle 
+    /// </summary>
+    public double SelectionYOffset;
+
+
     public readonly TextViewerSelection TextViewerSelection; //highlights the characters presently selected
+
+
+    public readonly TextViewerGlyph TextViewerGlyph; //draws the characters
 
 
     public readonly Window OwnerWindow;
@@ -53,7 +65,6 @@ namespace PdfFilesTextBrowser {
     readonly ScrollBar verticalScrollBar;
     readonly ScrollBar horizontalScrollBar;
     readonly ZoomButton zoomButton;
-    readonly TextViewerGlyph textViewerGlyph; //draws the characters
     readonly MenuItem zoomInMenuItem;
     readonly MenuItem zoomResetMenuItem;
     readonly MenuItem zoomOutMenuItem;
@@ -83,11 +94,11 @@ namespace PdfFilesTextBrowser {
       AddChild(zoomButton);
 
       //create textViewerGlyph first, because textViewerGlyph.DisplayedGlyphWidths is used in the textViewerSelection constructor
-      textViewerGlyph = new(this, textViewerGlyphMaxLineWidthChanged);
+      TextViewerGlyph = new(this, textViewerGlyph_MaxDocuLineWidthChanged);
       TextViewerSelection = new(this);
       //add textViewerSelection first as child, because it has to be under textViewerGlyph.
       AddChild(TextViewerSelection);
-      AddChild(textViewerGlyph);
+      AddChild(TextViewerGlyph);
 
       Loaded += TextViewer_Loaded;
       //SizeChanged += TextViewer_SizeChanged;
@@ -148,41 +159,6 @@ namespace PdfFilesTextBrowser {
     }
 
 
-    //bool isFirstTime = true;
-
-
-    //private void TextViewer_SizeChanged(object sender, SizeChangedEventArgs e) {
-    //  System.Diagnostics.Debug.WriteLine(Environment.NewLine);
-    //  if (isFirstTime) {
-    //    LogLine($"First time TextViewer_SizeChanged with forced InvalidateVisual()");
-    //  }
-    //  LogLine($"TextViewer_SizeChanged ActualWidth: {ActualWidth:F0}; ActualHeight: {ActualHeight:F0};");
-    //  resize();
-    //  if (isFirstTime) {
-    //    isFirstTime = false;
-    //    InvalidateVisual();
-    //  }
-    //}
-
-
-    //private void resize() {
-    //  var availableHeight = ActualHeight-ScrollbarThickness;
-    //  if (availableHeight<FontSize) return; //not enough space to display any text
-
-    //  LinesPerPage = (int)Math.Floor((availableHeight) / FontSize);
-    //  LogLine(
-    //    $"resize ActualHeight: {ActualHeight:F0}, FontSize: {FontSize}, TextStore.LinesCount: {TextStore.LinesCount}, LinesPerPage: {LinesPerPage}");
-    //  verticalScrollBar.LargeChange = verticalScrollBar.ViewportSize = LinesPerPage;
-    //  verticalScrollBar.Maximum = TextStore.LinesCount-LinesPerPage + 1;
-    //  LogLine(
-    //    $"verticalScrollBar Maximum: {verticalScrollBar.Maximum:F0}, LargeChange: {verticalScrollBar.LargeChange:F0}; Value: {verticalScrollBar.Value:F0}");
-    //  textViewerGlyph.SetDisplayLines(new DisplayLines((int)verticalScrollBar.Value, LinesPerPage));
-    //  //textViewerGlyph.ResetMaxLineWidth();
-    //  zoomButton.IsZoomInEnabled = zoomInMenuItem.IsEnabled = zoomStep*FontSize<=ActualHeight/2;
-    //  zoomButton.IsZoomOutEnabled = zoomOutMenuItem.IsEnabled = FontSize>=zoomStep*zoomMinFontSize;
-    //}
-
-
     private void TextViewer_MouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e) {
       if (e.Delta<0) {
         verticalScrollBar.Value = Math.Min(verticalScrollBar.Maximum, verticalScrollBar.Value+5);
@@ -204,7 +180,7 @@ namespace PdfFilesTextBrowser {
 
 
     public void UpdateMouseCursorAndSelection() {
-      if (textViewerGlyph.DisplayLines is null) return;
+      if (TextViewerGlyph.ViewLines is null) return;
 
       var position = Mouse.GetPosition(this);
       if (position.X<0 || position.X>ActualWidth || position.Y<0 || position.Y>ActualHeight) return;//Mouse not in TextViewer
@@ -223,23 +199,23 @@ namespace PdfFilesTextBrowser {
         //mouse might have been released outside TextViewer
         isMouseDown = false;
       } else if (isMouseDown) {
-        var currentMouseAbsolutLine = Math.Min(mouseDisplayLine + textViewerGlyph.DisplayLines.StartAbsoluteLine, TextStore.LinesCount -1);
-        var currentCharPosLeft = TextViewerSelection.GetCharPosLeft(ref currentMouseAbsolutLine, position.X + textViewerGlyph.XOffset - TextViewerGlyph.BorderX);
+        var currentMouseDocuLine = Math.Min(mouseDisplayLine + TextViewerGlyph.ViewLines.StartDocuLine, TextStore.LinesCount -1);
+        var currentCharPosLeft = TextViewerSelection.GetCharPosLeft(ref currentMouseDocuLine, 
+          position.X + TextViewerGlyph.ScrollViewX - TextViewerGlyph.TextStartDocuX);
 
-        if (mouseDownStartAbsoluteLine<currentMouseAbsolutLine) {
-          TextViewerSelection.SetSelection(new TextStoreSelection(TextStore, mouseDownStartAbsoluteLine, 
-            mouseDownStartCharPosLeft, currentMouseAbsolutLine, currentCharPosLeft), isImmediateRenderingNeeded: true);
-        } else if (mouseDownStartAbsoluteLine>currentMouseAbsolutLine) {
-          TextViewerSelection.SetSelection(new TextStoreSelection(TextStore, currentMouseAbsolutLine, currentCharPosLeft, 
-            mouseDownStartAbsoluteLine, mouseDownStartCharPosLeft), isImmediateRenderingNeeded: true);
+        if (mouseDownStartDocuLine<currentMouseDocuLine) {
+          TextViewerSelection.SetSelection(new TextStoreSelection(TextStore, mouseDownStartDocuLine, 
+            mouseDownStartCharPosLeft, currentMouseDocuLine, currentCharPosLeft), isImmediateRenderingNeeded: true);
+        } else if (mouseDownStartDocuLine>currentMouseDocuLine) {
+          TextViewerSelection.SetSelection(new TextStoreSelection(TextStore, currentMouseDocuLine, currentCharPosLeft, 
+            mouseDownStartDocuLine, mouseDownStartCharPosLeft), isImmediateRenderingNeeded: true);
         } else {
-          //mouseDownStartAbsoluteLine==currentAbsolutLine
           if (mouseDownStartCharPosLeft<currentCharPosLeft) {
-            TextViewerSelection.SetSelection(new TextStoreSelection(TextStore, mouseDownStartAbsoluteLine, 
-              mouseDownStartCharPosLeft, currentMouseAbsolutLine, currentCharPosLeft), isImmediateRenderingNeeded: true);
+            TextViewerSelection.SetSelection(new TextStoreSelection(TextStore, mouseDownStartDocuLine, 
+              mouseDownStartCharPosLeft, currentMouseDocuLine, currentCharPosLeft), isImmediateRenderingNeeded: true);
           } else {
-            TextViewerSelection.SetSelection(new TextStoreSelection(TextStore, currentMouseAbsolutLine, currentCharPosLeft, 
-              mouseDownStartAbsoluteLine, mouseDownStartCharPosLeft), isImmediateRenderingNeeded: true);
+            TextViewerSelection.SetSelection(new TextStoreSelection(TextStore, currentMouseDocuLine, currentCharPosLeft, 
+              mouseDownStartDocuLine, mouseDownStartCharPosLeft), isImmediateRenderingNeeded: true);
           }
         }
       }
@@ -256,12 +232,12 @@ namespace PdfFilesTextBrowser {
 
 
     bool isMouseDown;
-    int mouseDownStartAbsoluteLine;
+    int mouseDownStartDocuLine;
     int mouseDownStartCharPosLeft;
 
 
     private void TextViewer_MouseDown(object sender, MouseButtonEventArgs e) {
-      if (textViewerGlyph.DisplayLines is null) return;
+      if (TextViewerGlyph.ViewLines is null) return;
       /////////////////////
       //var sb = new StringBuilder();
       ////for (int charIndex = 0; charIndex<TextStore.CharsCount; charIndex++) {
@@ -273,13 +249,13 @@ namespace PdfFilesTextBrowser {
 
       var mouseDownStartPosition = Mouse.GetPosition(this);
       var mouseDownStartLine = Math.Min((int)(mouseDownStartPosition.Y / FontSize), LinesPerPage-1);
-      mouseDownStartAbsoluteLine = Math.Min(mouseDownStartLine + textViewerGlyph.DisplayLines.StartAbsoluteLine, TextStore.LinesCount -1);
-      var absoluteX = mouseDownStartPosition.X + textViewerGlyph.XOffset;
+      mouseDownStartDocuLine = Math.Min(mouseDownStartLine + TextViewerGlyph.ViewLines.StartDocuLine, TextStore.LinesCount -1);
+      var mouseDownDocuX = mouseDownStartPosition.X + TextViewerGlyph.ScrollViewX - TextViewerGlyph.TextStartDocuX;
 
-      var textViewerObject = TextViewerObjects.GetObjectForDisplayLine(mouseDownStartLine, absoluteX);
+      var textViewerObject = TextViewerObjects.GetObjectForDisplayLine(mouseDownStartLine, mouseDownDocuX);
       if (textViewerObject is not null) {
         if (textViewerObject.IsLink) {
-          textViewerGlyph.SetMarker(textViewerObject.Anchor);
+          TextViewerGlyph.SetMarker(textViewerObject.Anchor);
           verticalScrollBar.Value = Math.Min(Math.Max(textViewerObject.Anchor!.Line-3, 0), verticalScrollBar.Maximum);
           //LogLine2($"TextViewer_MouseDown scrollBar.Value: {verticalScrollBar.Value:F0}");
           InvalidateVisual(); //needs to force a redraw even if exactly the same page gets displayed, so that the anchor 
@@ -297,7 +273,7 @@ namespace PdfFilesTextBrowser {
         }
       } else {
         isMouseDown = true;
-        mouseDownStartCharPosLeft = TextViewerSelection.GetCharPosLeft(ref mouseDownStartAbsoluteLine, absoluteX);
+        mouseDownStartCharPosLeft = TextViewerSelection.GetCharPosLeft(ref mouseDownStartDocuLine, mouseDownDocuX);
       }
     }
 
@@ -358,24 +334,24 @@ namespace PdfFilesTextBrowser {
 
 
     private void VerticalScrollBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
-      if (textViewerGlyph.DisplayLines is null) return;
+      if (TextViewerGlyph.ViewLines is null) return;
 
-      if (textViewerGlyph.DisplayLines.StartAbsoluteLine!=verticalScrollBar.Value) {
+      if (TextViewerGlyph.ViewLines.StartDocuLine!=verticalScrollBar.Value) {
         //LogLine($"VerticalScrollBar_ValueChanged: {verticalScrollBar.Value}");
       }
-      textViewerGlyph.SetDisplayLines(new DisplayLines((int)verticalScrollBar.Value, LinesPerPage));
+      TextViewerGlyph.SetViewLines(new ViewLines((int)verticalScrollBar.Value, LinesPerPage));
     }
 
 
-    double maxLineWidthZoomFactor1;//number of pixels needed to display the widest TextStore line displayed so far at zoomFactor 1
+    double maxDocuLineWidthZoomFactor1;//number of pixels needed to display the widest TextStore line displayed so far at zoomFactor 1
 
 
-    private void textViewerGlyphMaxLineWidthChanged() {
-      var newMaxLineWidth = Math.Max(maxLineWidthZoomFactor1, textViewerGlyph.MaxLineWidth/zoomFactor);
-      if (maxLineWidthZoomFactor1!=newMaxLineWidth) {
-        maxLineWidthZoomFactor1 = newMaxLineWidth;
-        //LogLine($"TextViewer_MaxLineWidthChanged MaxLineWidth: {textViewerGlyph.MaxLineWidth:F0}; " +
-        //  $"zoomFactor {zoomFactor}; maxLineWidthZoomFactor1: {maxLineWidthZoomFactor1:F0}");
+    private void textViewerGlyph_MaxDocuLineWidthChanged() {
+      var newMaxDocuLineWidth = Math.Max(maxDocuLineWidthZoomFactor1, TextViewerGlyph.MaxDocuLineWidth/zoomFactor);
+      if (maxDocuLineWidthZoomFactor1!=newMaxDocuLineWidth) {
+        maxDocuLineWidthZoomFactor1 = newMaxDocuLineWidth;
+        //LogLine($"TextViewer_MaxDocuLineWidthChanged MaxDocuLineWidth: {textViewerGlyph.MaxDocuLineWidth:F0}; " +
+        //  $"zoomFactor {zoomFactor}; maxDocuLineWidthZoomFactor1: {maxDocuLineWidthZoomFactor1:F0}");
         InvalidateVisual();
       }
     }
@@ -401,7 +377,7 @@ namespace PdfFilesTextBrowser {
     private void HorizontalScrollBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
       //LogLine2($"HorizontalScrollBar_ValueChanged: {horizontalScrollBar.Value:F0}; ActualWidth: {ActualWidth:F0}; " +
       //  $"MaxLineWidth: {textViewerGlyph.MaxLineWidth:F0};");
-      textViewerGlyph.SetXOffset(horizontalScrollBar.Value*zoomFactor);
+      TextViewerGlyph.SetScrollViewX(horizontalScrollBar.Value*zoomFactor);
     }
 
 
@@ -530,22 +506,23 @@ namespace PdfFilesTextBrowser {
       this.tokeniser = tokeniser;
       zoomFactor = 1;
       TextStore.Reset();
-      textViewerGlyph.Reset();
+      TextViewerGlyph.Reset();
       TextViewerSelection.Reset();
       anchors.Clear();
       ///////////////////
-      //TextStore.Append(new byte[] { (byte)'W', (byte)'n', (byte)'m', (byte)'d', (byte)'e', (byte)'f', (byte)'g', (byte)'h', (byte)'i', (byte)'j', (byte)'k', (byte)'l', (byte)'m', (byte)'n', (byte)'o', (byte)'\r' });
-      //TextStore.Append(new byte[] { (byte)'i', (byte)'A', (byte)'B', (byte)'C', (byte)'D', (byte)'E', (byte)'F', (byte)'G', (byte)'H', (byte)'I', (byte)'J', (byte)'K', (byte)'L', (byte)'M', (byte)'N', (byte)'O', (byte)'\r' });
-      //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'1', (byte)'2', (byte)'3', (byte)'{', (byte)'b', (byte)'4', (byte)'5', (byte)'6', (byte)'}', (byte)'7', (byte)'8', (byte)'9', (byte)'\r' });
-      //TextStore.Append(new byte[] { (byte)'\r' });
-      //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'i', (byte)'a', (byte)'b', (byte)'c', (byte)'d', (byte)'e', (byte)'f', (byte)'g', (byte)'h', (byte)'i', (byte)'j', (byte)'k', (byte)'l', (byte)'m', (byte)'n', (byte)'o', (byte)'\r' });
-      //TextStore.Append(new byte[] { (byte)'{', (byte)'u', (byte)'i', (byte)'}', (byte)'i', (byte)'{', (byte)'u', (byte)'i', (byte)'i', (byte)'}', (byte)'A', (byte)'B', (byte)'C', (byte)'D', (byte)'E', (byte)'F', (byte)'{', (byte)'u', (byte)'G', (byte)'H', (byte)'I', (byte)'}', (byte)'J', (byte)'K', (byte)'L', (byte)'M', (byte)'N', (byte)'O', (byte)'\r' });
-      //TextStore.Append(new byte[] { (byte)'1', (byte)'\r', (byte)'2', (byte)'\r', (byte)'3', (byte)'\r', (byte)'4', (byte)'\r', (byte)'5', (byte)'\r', (byte)'6', (byte)'\r', (byte)'7', (byte)'\r', (byte)'8', (byte)'\r', (byte)'9', (byte)'\r', (byte)'0', (byte)'\r' });
-      //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'a', (byte)'b', (byte)'c', (byte)'d', (byte)'e', (byte)'f', (byte)'g', (byte)'h', (byte)'i', (byte)'j', (byte)'k', (byte)'l', (byte)'m', (byte)'n', (byte)'o', (byte)'\r' });
-      //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'A', (byte)'B', (byte)'C', (byte)'D', (byte)'E', (byte)'F', (byte)'G', (byte)'H', (byte)'I', (byte)'J', (byte)'K', (byte)'L', (byte)'M', (byte)'N', (byte)'O', (byte)'\r' });
-      //TextStore.Append(new byte[] { (byte)'1', (byte)'\r', (byte)'2', (byte)'\r', (byte)'3', (byte)'\r', (byte)'4', (byte)'\r', (byte)'5', (byte)'\r', (byte)'6', (byte)'\r', (byte)'7', (byte)'\r', (byte)'8', (byte)'\r', (byte)'9', (byte)'\r', (byte)'0', (byte)'\r' });
-      //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'1', (byte)'2', (byte)'3', (byte)'{', (byte)'b', (byte)'4', (byte)'5', (byte)'6', (byte)'}', (byte)'7', (byte)'8', (byte)'9', (byte)'\r' });
+      ////TextStore.Append(new byte[] { (byte)'W', (byte)'n', (byte)'m', (byte)'d', (byte)'e', (byte)'f', (byte)'g', (byte)'h', (byte)'i', (byte)'j', (byte)'k', (byte)'l', (byte)'m', (byte)'n', (byte)'o', (byte)'\r' }, 999);
+      ////TextStore.Append(new byte[] { (byte)'i', (byte)'A', (byte)'B', (byte)'C', (byte)'D', (byte)'E', (byte)'F', (byte)'G', (byte)'H', (byte)'I', (byte)'J', (byte)'K', (byte)'L', (byte)'M', (byte)'N', (byte)'O', (byte)'\r' }, 999);
+      //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'1', (byte)'2', (byte)'3', (byte)'{', (byte)'b', (byte)'4', (byte)'5', (byte)'6', (byte)'}', (byte)'7', (byte)'8', (byte)'9', (byte)'\r' }, 999);
+      //TextStore.Append(new byte[] { (byte)'\r' }, 999);
+      //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'i', (byte)'a', (byte)'b', (byte)'c', (byte)'d', (byte)'e', (byte)'f', (byte)'g', (byte)'h', (byte)'i', (byte)'j', (byte)'k', (byte)'l', (byte)'m', (byte)'n', (byte)'o', (byte)'\r' }, 999);
+      //TextStore.Append(new byte[] { (byte)'{', (byte)'u', (byte)'i', (byte)'}', (byte)'i', (byte)'{', (byte)'u', (byte)'i', (byte)'i', (byte)'}', (byte)'A', (byte)'B', (byte)'C', (byte)'D', (byte)'E', (byte)'F', (byte)'{', (byte)'u', (byte)'G', (byte)'H', (byte)'I', (byte)'}', (byte)'J', (byte)'K', (byte)'L', (byte)'M', (byte)'N', (byte)'O', (byte)'\r' }, 999);
+      //TextStore.Append(new byte[] { (byte)'1', (byte)'\r', (byte)'2', (byte)'\r', (byte)'3', (byte)'\r', (byte)'4', (byte)'\r', (byte)'5', (byte)'\r', (byte)'6', (byte)'\r', (byte)'7', (byte)'\r', (byte)'8', (byte)'\r', (byte)'9', (byte)'\r', (byte)'0', (byte)'\r' }, 999);
+      //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'a', (byte)'b', (byte)'c', (byte)'d', (byte)'e', (byte)'f', (byte)'g', (byte)'h', (byte)'i', (byte)'j', (byte)'k', (byte)'l', (byte)'m', (byte)'n', (byte)'o', (byte)'\r' }, 999);
+      //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'i', (byte)'A', (byte)'B', (byte)'C', (byte)'D', (byte)'E', (byte)'F', (byte)'G', (byte)'H', (byte)'I', (byte)'J', (byte)'K', (byte)'L', (byte)'M', (byte)'N', (byte)'O', (byte)'\r' }, 999);
+      //TextStore.Append(new byte[] { (byte)'1', (byte)'\r', (byte)'2', (byte)'\r', (byte)'3', (byte)'\r', (byte)'4', (byte)'\r', (byte)'5', (byte)'\r', (byte)'6', (byte)'\r', (byte)'7', (byte)'\r', (byte)'8', (byte)'\r', (byte)'9', (byte)'\r', (byte)'0', (byte)'\r' }, 999);
+      //TextStore.Append(new byte[] { (byte)'i', (byte)'i', (byte)'1', (byte)'2', (byte)'3', (byte)'{', (byte)'b', (byte)'4', (byte)'5', (byte)'6', (byte)'}', (byte)'7', (byte)'8', (byte)'9', (byte)'\r' }, 999);
       //InvalidateVisual();
+      //return;
       ///////////////////
 
       System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {System.Threading.Thread.CurrentThread.ManagedThreadId} " +
@@ -565,17 +542,6 @@ namespace PdfFilesTextBrowser {
         MainWindow.Current!.SetBytesTab(isError: true);
       }
       InvalidateVisual();
-      //if (returnString is null) {
-      //  IsLoadError = false;
-      //  errorTextBox.Visibility = Visibility.Collapsed;
-      //  MainWindow.Current!.SetBytesTab(isError: false);
-      //  InvalidateVisual();
-      //} else {
-      //  IsLoadError = true;
-      //  errorTextBox.Visibility = Visibility.Visible;
-      //  errorTextBox.Text = returnString;
-      //  MainWindow.Current!.SetBytesTab(isError: true);
-      //}
     }
 
 
@@ -597,7 +563,7 @@ namespace PdfFilesTextBrowser {
 
 
     public void SetSelection(TextStoreSelection? selection) {
-      if (textViewerGlyph.DisplayLines is null) return;
+      if (TextViewerGlyph.ViewLines is null) return;
 
       if (selection is null) {
         TextViewerSelection.SetSelection(null, isImmediateRenderingNeeded: true);
@@ -605,17 +571,18 @@ namespace PdfFilesTextBrowser {
       }
 
       var isNoScrolling = true;
-      if (selection.StartLine<textViewerGlyph.DisplayLines.StartAbsoluteLine ||
-        selection.StartLine>textViewerGlyph.DisplayLines.EndAbsoluteLine) 
+      if (selection.StartLine<TextViewerGlyph.ViewLines.StartDocuLine ||
+        selection.StartLine>TextViewerGlyph.ViewLines.EndDocuLine) 
         {
         //selection does not start within displayed lines.
         verticalScrollBar.Value = Math.Min(Math.Max(selection.StartLine-3, 0), verticalScrollBar.Maximum);
         isNoScrolling = false;
       }
-      var startX = textViewerGlyph.GetStartX(selection);
-      if (startX<textViewerGlyph.XOffset || startX>textViewerGlyph.XOffset+ActualWidth) {
+      //**--**//
+      var textOffsetX = TextViewerGlyph.GetTextX(selection);
+      if (textOffsetX<TextViewerGlyph.ScrollViewX || textOffsetX>TextViewerGlyph.ScrollViewX+ActualWidth) {
         //selection starts to the left or the right of the displayed lines.
-        startX = Math.Min(Math.Max(startX-2*FontSize, 0), horizontalScrollBar.Maximum);
+        textOffsetX = Math.Min(Math.Max(textOffsetX-2*FontSize, 0), horizontalScrollBar.Maximum);
 
         //horizontalScrollBar.Value = Math.Min(startX, horizontalScrollBar.Maximum);
         InvalidateVisual();
@@ -695,9 +662,11 @@ namespace PdfFilesTextBrowser {
         var remainingHeight = constraint.Height - horizontalScrollBar.DesiredSize.Height;
         if (remainingWidth>0 && remainingHeight>0) {
           TextViewerSelection.Measure(new Size(remainingWidth, remainingHeight));
-          textViewerGlyph.Measure(new Size(remainingWidth, remainingHeight));
+          TextViewerGlyph.Measure(new Size(remainingWidth, remainingHeight));
         }
       //}
+
+      SelectionYOffset = FontSize / 5;//set it already here in case TextViewerGlyph needs it
       return constraint;
     }
 
@@ -725,7 +694,7 @@ namespace PdfFilesTextBrowser {
         if (horizontalScrollBarY>0 && verticalScrollBarX>0) {
           TextViewerSelection.ArrangeBorderPadding(arrangeRect, 0, 0, verticalScrollBarX,
             horizontalScrollBarY);
-          textViewerGlyph.ArrangeBorderPadding(arrangeRect, 0, 0, verticalScrollBarX, horizontalScrollBarY);
+          TextViewerGlyph.ArrangeBorderPadding(arrangeRect, 0, 0, verticalScrollBarX, horizontalScrollBarY);
         }
       //}
       return arrangeRect.Size;
@@ -743,7 +712,7 @@ namespace PdfFilesTextBrowser {
       //  $"ArrangeContentOverride VerticalScrollBar pixelHeight: {pixelHeight:F0}, FontSize: {FontSize}, LinesPerPage: {LinesPerPage}, " + 
       //  $"LargeChange: {verticalScrollBar.LargeChange}; TextStore.LinesCount: {TextStore.LinesCount}, " +
       //  $"verticalScrollBar Maximum: {verticalScrollBar.Maximum:F0}, Value: {verticalScrollBar.Value:F0}");
-      textViewerGlyph.SetDisplayLines(new DisplayLines((int)verticalScrollBar.Value, LinesPerPage));
+      TextViewerGlyph.SetViewLines(new ViewLines((int)verticalScrollBar.Value, LinesPerPage));
     }
 
 
@@ -751,13 +720,13 @@ namespace PdfFilesTextBrowser {
       //horizontalScrollBar.Value is pixel offset from left border ZoomFactor=1
       horizontalScrollBar.ViewportSize = horizontalScrollBar.LargeChange = pixelWidth / zoomFactor;
       horizontalScrollBar.SmallChange = horizontalScrollBar.LargeChange / 10;
-      horizontalScrollBar.Maximum = Math.Max(0, maxLineWidthZoomFactor1 - horizontalScrollBar.ViewportSize);
+      horizontalScrollBar.Maximum = Math.Max(0, maxDocuLineWidthZoomFactor1 - horizontalScrollBar.ViewportSize);
       //LogLineSkip2Line(
       //$"ArrangeContentOverride HorizontalScrollBar pixelWidth: {pixelWidth:F0}; zoomFactor: {zoomFactor}; " +
       //$"LargeChange: {horizontalScrollBar.LargeChange:F0}; " +
       //$"maxLineWidthZoomFactor1: {maxLineWidthZoomFactor1:F0}; Maximum: {horizontalScrollBar.Maximum:F0}; " +
       //$"Value: {horizontalScrollBar.Value:F0}");
-      textViewerGlyph.SetXOffset(horizontalScrollBar.Value*zoomFactor);
+      TextViewerGlyph.SetScrollViewX(horizontalScrollBar.Value*zoomFactor);
     }
 
 

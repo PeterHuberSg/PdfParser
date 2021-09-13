@@ -47,6 +47,7 @@ namespace PdfParserLib {
     static readonly byte[] formatStream = {(byte)' ', (byte)'{', (byte)'s'};
     static readonly byte[] formatStreamEnd = { (byte)'}', (byte)' ' };
     static readonly byte[] endstream = { (byte)'e', (byte)'n', (byte)'d', (byte)'s', (byte)'t', (byte)'r', (byte)'e', (byte)'a', (byte)'m' };
+    const int spanContainsNoEOL = int.MinValue;
 
 
     public static Exception? Convert(Tokeniser tokeniser, TextStore textStore, Dictionary<string, TextViewerAnchor> anchors){
@@ -79,13 +80,13 @@ namespace PdfParserLib {
           var b = pdfBytesArray[bytesIndex++];
           //double brackets if they are not part of a format instruction
           if (b=='{') {
-            textStore.Append(pdfBytesArray.AsSpan(startIndex, bytesIndex - startIndex));
+            textStore.Append(pdfBytesArray.AsSpan(startIndex, bytesIndex - startIndex), startIndex);
             startIndex = bytesIndex;
-            textStore.Append(formatStart);
+            textStore.Append(formatStart, spanContainsNoEOL);
           } else if (b=='}') {
-            textStore.Append(pdfBytesArray.AsSpan(startIndex, bytesIndex - startIndex));
+            textStore.Append(pdfBytesArray.AsSpan(startIndex, bytesIndex - startIndex), startIndex);
             startIndex = bytesIndex;
-            textStore.Append(formatEnd);
+            textStore.Append(formatEnd, spanContainsNoEOL);
           }
 
           switch (state) {
@@ -155,10 +156,10 @@ namespace PdfParserLib {
 
           case stateEnum.digits2Space:
             if (b=='R') {
-              textStore.Append(pdfBytesArray.AsSpan(startIndex, number1Pos - startIndex));
-              textStore.Append(formatLink);
-              textStore.Append(pdfBytesArray.AsSpan(number1Pos, lastNumber2Pos-number1Pos));
-              textStore.Append(formatEnd);
+              textStore.Append(pdfBytesArray.AsSpan(startIndex, number1Pos - startIndex), startIndex);
+              textStore.Append(formatLink, spanContainsNoEOL);
+              textStore.Append(pdfBytesArray.AsSpan(number1Pos, lastNumber2Pos-number1Pos), number1Pos);
+              textStore.Append(formatEnd, spanContainsNoEOL);
               startIndex = lastNumber2Pos;
               state = stateEnum.parse;
             } else if (b=='o') {
@@ -186,11 +187,11 @@ namespace PdfParserLib {
 
           case stateEnum.obj_b:
             if (b=='j') {
-              textStore.Append(pdfBytesArray.AsSpan(startIndex, number1Pos - startIndex));
-              textStore.Append(formatAnchor);
+              textStore.Append(pdfBytesArray.AsSpan(startIndex, number1Pos - startIndex), startIndex);
+              textStore.Append(formatAnchor, spanContainsNoEOL);
               var objectIdBytesSpan = pdfBytesArray.AsSpan(number1Pos, lastNumber2Pos-number1Pos);
-              textStore.Append(objectIdBytesSpan);
-              textStore.Append(formatEnd);
+              textStore.Append(objectIdBytesSpan, spanContainsNoEOL);
+              textStore.Append(formatEnd, spanContainsNoEOL);
               anchorObjectIdStringBuilder.Clear();
               foreach (var anchorObjectIdByte in objectIdBytesSpan) {
                 anchorObjectIdStringBuilder.Append((char)anchorObjectIdByte);
@@ -238,11 +239,11 @@ namespace PdfParserLib {
 
           case stateEnum.stream_a:
             if (b=='m') {
-              textStore.Append(pdfBytesArray.AsSpan(startIndex, bytesIndex - startIndex));
-              textStore.Append(formatStream);
+              textStore.Append(pdfBytesArray.AsSpan(startIndex, bytesIndex - startIndex), startIndex);
+              textStore.Append(formatStream, spanContainsNoEOL);
               var streamObjectIdSpan = pdfBytesArray.AsSpan(streamObjectIdStart, streamObjectIdEnd-streamObjectIdStart);
-              textStore.Append(streamObjectIdSpan);
-              textStore.Append(formatStreamEnd);
+              textStore.Append(streamObjectIdSpan, spanContainsNoEOL);
+              textStore.Append(formatStreamEnd, spanContainsNoEOL);
               var streamToken = tokeniser.GetToken(new ObjectId(streamObjectIdSpan));
               if (streamToken is DictionaryToken streamDictionaryToken) {
                 //skip stream bytes
@@ -392,7 +393,7 @@ namespace PdfParserLib {
           //  isSkipStreamChars = false;
           //}
         }
-        textStore.Append(pdfBytesArray.AsSpan(startIndex, bytesIndex - startIndex));
+        textStore.Append(pdfBytesArray.AsSpan(startIndex, bytesIndex - startIndex), startIndex);
         System.Diagnostics.Debug.WriteLine($"{DateTime.Now:mm.ss.ffff} {Thread.CurrentThread.ManagedThreadId} PdfToTextStore.Convert() completed");
         return null;
 

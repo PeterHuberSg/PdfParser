@@ -29,9 +29,9 @@ namespace PdfParserTest {
       for (int bytesIndex = 0; bytesIndex < bytes.Length; bytesIndex++) {
         bytes[bytesIndex] = (byte)bytesIndex;
       }
-      textStore.Append(bytes);
+      textStore.Append(bytes, 0);
       Assert.AreEqual(3, textStore.LinesCount);
-      textStore.Append(new byte[] { 0xA });
+      textStore.Append(new byte[] { 0xA }, 0);
       Assert.AreEqual(3, textStore.LinesCount);
     }
 
@@ -44,7 +44,7 @@ namespace PdfParserTest {
       pdfBytes[text.Length] = (byte)'\r';
 
       ReadOnlySpan<byte> readOnlySpan = pdfBytes;
-      textStore.Append(readOnlySpan);
+      textStore.Append(readOnlySpan, 0);
       expectedStrings.Add(text);
       assertText(textStore, expectedStrings);
     }
@@ -262,13 +262,13 @@ namespace PdfParserTest {
 
 
     private void append(TextStore textStore, char c) {
-      textStore.Append(new byte[] { (byte)c });
+      textStore.Append(new byte[] { (byte)c }, 0);
       System.Diagnostics.Debug.WriteLine(Environment.NewLine + $"{textStore}");
     }
 
 
     private void append(TextStore textStore, byte[] bytes) {
-      textStore.Append(bytes);
+      textStore.Append(bytes, 0);
       System.Diagnostics.Debug.WriteLine(Environment.NewLine + $"{textStore}");
     }
 

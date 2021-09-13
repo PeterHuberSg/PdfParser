@@ -23,6 +23,7 @@ namespace PdfParserLib {
     public int CharsCount => charsCount;
     public int LinesCount => linesCount;
     public int[] LineStarts;
+    public int[] LineByteOffsets;
 
 
     //public int[] LineStarts;
@@ -33,16 +34,6 @@ namespace PdfParserLib {
         if (index<0) throw new ArgumentException($"Index '{index}' must be greater equal 0.");
         if (index>=LinesCount) throw new ArgumentException($"Index '{index}' must be smaller than LinesCount {LinesCount}.");
 
-        //int endCharIndex;
-        //var nextLineIndex = index+1;
-        //if (nextLineIndex==LinesCount) {
-        //  endCharIndex = charsCount;
-        //} else {
-        //  endCharIndex = LineStarts[nextLineIndex] ;
-        //}
-
-        //LineStarts[0] is always 0
-        //LineStarts[charsCount] is always 0
         var startIndex = LineStarts[index];
         var endCharIndex = LineStarts[index+1];  
         if (startIndex==endCharIndex) {
@@ -70,13 +61,16 @@ namespace PdfParserLib {
 
       chars = new char[size];
       LineStarts = new int[Math.Max(1, size/40)];
+      LineByteOffsets = new int[Math.Max(1, size/40)];
     }
 
 
     public void Reset() {
       charsCount = 0;
-      linesCount = 0;
-      isNewLine = true;
+      linesCount = 1;
+      isNewLine = false;
+      LineStarts[0] = 0;
+      LineByteOffsets[0] = 0;
     }
     #endregion
 
@@ -84,16 +78,22 @@ namespace PdfParserLib {
     #region Methods
     //      -------
 
-    public void Append(ReadOnlySpan<byte> pdfBytes) {
+    public void Append(ReadOnlySpan<byte> pdfBytes, int byteOffsetStart) {
+      //if (byteOffsetStart==int.MinValue) {
+
+      //}
       var isCarriageReturn = false;
-      foreach (var pdfByte in pdfBytes) {
-        if (isNewLine) {
-          isNewLine = false;
-          if (linesCount>=LineStarts.Length) {
-            Array.Resize(ref LineStarts, LineStarts.Length*2);
-          }
-          LineStarts[linesCount++] = charsCount;
-        }
+      for (int pdfBytesIndex = 0; pdfBytesIndex < pdfBytes.Length; pdfBytesIndex++) {
+        var pdfByte = pdfBytes[pdfBytesIndex];
+        //if (isNewLine) {
+        //  isNewLine = false;
+        //  if (linesCount>=LineStarts.Length) {
+        //    Array.Resize(ref LineStarts, LineStarts.Length*2);
+        //    Array.Resize(ref LineByteOffsets, LineByteOffsets.Length*2);
+        //  }
+        //  LineStarts[linesCount] = charsCount;
+        //  LineByteOffsets[linesCount++] = byteOffsetStart + pdfBytesIndex +1;
+        //}
 
         if (charsCount+10>chars.Length) {
           //ensure there is plenty of space for 1 more character, which might need several chars
@@ -104,6 +104,7 @@ namespace PdfParserLib {
         if (isCarriageReturn && pdfByte==0xa) {
           //skip linefeed after carriage return
           isCarriageReturn = false;
+          LineByteOffsets[linesCount-1]++;//
           continue;
         }
         
@@ -111,7 +112,13 @@ namespace PdfParserLib {
         if (isCarriageReturn || pdfByte==0xa) {
           //end of line found
           chars[charsCount++] = '\r';//add carriage return to mark end of line, which helps when searching for multiple lines
-          isNewLine = true;
+          //isNewLine = true;
+          if (linesCount>=LineStarts.Length) {
+            Array.Resize(ref LineStarts, LineStarts.Length*2);
+            Array.Resize(ref LineByteOffsets, LineByteOffsets.Length*2);
+          }
+          LineStarts[linesCount] = charsCount;
+          LineByteOffsets[linesCount++] = byteOffsetStart + pdfBytesIndex +1;
           continue;
         }
 
@@ -130,8 +137,10 @@ namespace PdfParserLib {
       if (linesCount>=LineStarts.Length) {
         Array.Resize(ref LineStarts, LineStarts.Length*2);//only 1 more entry is needed, but since LineStarts get reused,
                                                           //it makes sense to assign more space
+        Array.Resize(ref LineByteOffsets, LineByteOffsets.Length*2);
       }
       LineStarts[linesCount] = charsCount;//it makes reading chars easier if even chars[linesCount] has a value
+      LineByteOffsets[linesCount] = byteOffsetStart + pdfBytes.Length;
     }
 
 

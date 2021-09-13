@@ -52,7 +52,7 @@ namespace PdfFilesTextBrowser {
       Current = this;
       bytesTextViwer = new(this);
 
-      DirectoryTextBox.Text = @"D:\";
+      //DirectoryTextBox.Text = @"D:\";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\Invest\CS";
       //DirectoryTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\Invest\DBS";
@@ -70,7 +70,7 @@ namespace PdfFilesTextBrowser {
       //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\BDSM\climbing_hitches.pdf";
       //FileTextBox.Text = @"C:\Users\peter\OneDrive\OneDriveData\AHV\AnmeldungAHV2019.pdf";
       //FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202004.pdf";
-      //FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202104.pdf";
+      FileTextBox.Text = @"C:\Users\Peter\OneDrive\OneDriveData\Invest\DBS\DBS 202104.pdf";
       //FileTextBox.Text = @"D:\PDF32000_2008.pdf";
       //FileTextBox.Text = @"D:\Abmelung Horgen.pdf";
       //FileTextBox.Text = @"D:\comparison-of-private-hospital-ips.pdf";
