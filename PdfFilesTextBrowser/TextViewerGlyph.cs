@@ -554,12 +554,6 @@ namespace PdfFilesTextBrowser {
                 var name = stringBuilder.ToString();
                 if (textViewer.Anchors.TryGetValue(name, out var anchor)) {
                   if (anchor==markAnchor) {
-                    //drawingContext.DrawRectangle(Brushes.LightGreen, null,
-                    //  new Rect(
-                    //    origin.X + Math.Max(0, AdrLabelWidth - ScreenXOffset),
-                    //    origin.Y - fontSize + textViewer.TextViewerSelection.GlyphYOffset,
-                    //    glyphRunWidth, fontSize));
-                    drawingContext.DrawRectangle(Brushes.Black, null, new Rect(0, docuLine - fontSize, 100, docuLine - fontSize - 100));
                     drawingContext.DrawRectangle(Brushes.LightGreen, null,
                       new Rect(
                         viewX,
@@ -579,7 +573,6 @@ namespace PdfFilesTextBrowser {
 
               } else if (isStream) {
                 var objectIdString = stringBuilder.ToString();
-                //textViewer.TextViewerObjects.AddStream(new ObjectId(objectIdString), displayedDocuLineIndex, origin.X, origin.X + glyphRunWidth);
                 var docuX = viewX - TextStartDocuX + ScrollViewX;
                 textViewer.TextViewerObjects.AddStream(new ObjectId(objectIdString), docuLine, docuX, docuX + glyphRunWidth);
               }

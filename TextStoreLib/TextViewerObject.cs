@@ -202,10 +202,10 @@ namespace PdfParserLib {
 
 
     /// <summary>
-    /// Gets the object based one the display line number. First line displayed is 0, allthough in the TextStore it might
+    /// Gets the object based one the view line number. First line displayed is 0, although in the TextStore it might
     /// have a much higher line number
     /// </summary>
-    public TextViewerObject? GetObjectForDisplayLine(int displayLine, double x) {
+    public TextViewerObject? GetObjectForViewLine(int displayLine, double x) {
       if (displayLine>=DisplayLinesCount) return null;
 
       foreach (var textViewerObject in objectsLines[displayLine]) {

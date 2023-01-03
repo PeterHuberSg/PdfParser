@@ -83,12 +83,15 @@ namespace PdfFilesTextBrowser {
         VerticalAlignment = VerticalAlignment.Stretch,
       };
       AddChild(verticalScrollBar);
+      verticalScrollBar.ValueChanged += VerticalScrollBar_ValueChanged;
+
 
       horizontalScrollBar = new ScrollBar {
         Orientation= Orientation.Horizontal,
         HorizontalAlignment = HorizontalAlignment.Stretch,
       };
       AddChild(horizontalScrollBar);
+      horizontalScrollBar.ValueChanged += HorizontalScrollBar_ValueChanged;
 
       zoomButton = new ZoomButton(zoomIn, zoomOut);
       AddChild(zoomButton);
@@ -109,9 +112,6 @@ namespace PdfFilesTextBrowser {
       MouseUp += TextViewer_MouseUp;
       KeyDown += TextViewer_KeyDown;
       
-      verticalScrollBar.ValueChanged += VerticalScrollBar_ValueChanged;
-      horizontalScrollBar.ValueChanged += HorizontalScrollBar_ValueChanged;
-
       ContextMenu = new();
       var findMenuItem = new MenuItem { Header = "Find", InputGestureText = "Ctrl+'F'" };
       findMenuItem.Click += FindMenuItem_Click;
@@ -187,7 +187,7 @@ namespace PdfFilesTextBrowser {
 
       //update how mouse cursor looks
       var mouseDisplayLine = Math.Min((int)(position.Y / FontSize), LinesPerPage-1);
-      var textViewerObject = TextViewerObjects.GetObjectForDisplayLine(mouseDisplayLine, position.X);
+      var textViewerObject = TextViewerObjects.GetObjectForViewLine(mouseDisplayLine, position.X);
       if (textViewerObject is null) {
         Cursor = Cursors.Arrow;
       } else {
@@ -247,12 +247,12 @@ namespace PdfFilesTextBrowser {
       //var s = sb.ToString();
       /////////////////////
 
-      var mouseDownStartPosition = Mouse.GetPosition(this);
-      var mouseDownStartLine = Math.Min((int)(mouseDownStartPosition.Y / FontSize), LinesPerPage-1);
-      mouseDownStartDocuLine = Math.Min(mouseDownStartLine + TextViewerGlyph.ViewLines.StartDocuLine, TextStore.LinesCount -1);
-      var mouseDownDocuX = mouseDownStartPosition.X + TextViewerGlyph.ScrollViewX - TextViewerGlyph.TextStartDocuX;
+      var mouseDownStartViewPosition = Mouse.GetPosition(this);
+      var mouseDownStartViewLine = Math.Min((int)(mouseDownStartViewPosition.Y / FontSize), LinesPerPage-1);
+      mouseDownStartDocuLine = Math.Min(mouseDownStartViewLine + TextViewerGlyph.ViewLines.StartDocuLine, TextStore.LinesCount -1);
+      var mouseDownDocuX = mouseDownStartViewPosition.X + TextViewerGlyph.ScrollViewX - TextViewerGlyph.TextStartDocuX;
 
-      var textViewerObject = TextViewerObjects.GetObjectForDisplayLine(mouseDownStartLine, mouseDownDocuX);
+      var textViewerObject = TextViewerObjects.GetObjectForViewLine(mouseDownStartViewLine, mouseDownDocuX);
       if (textViewerObject is not null) {
         if (textViewerObject.IsLink) {
           TextViewerGlyph.SetMarker(textViewerObject.Anchor);
@@ -426,17 +426,7 @@ namespace PdfFilesTextBrowser {
         zoomFactor *= zoomStep;
         FontSize = newFontSize;
         //LogLine2($"zoomIn zoomFactor: {zoomFactor}; Font: {FontSize};");
-        //setHorizontalScrollBar();
-        //horizontalScrollBar.Value = Math.Min(horizontalScrollBar.Maximum, horizontalScrollBar.Value * zoomStep);
-        //LogLine($"zoomIn hScrollBar: {horizontalScrollBar.Value:F0};");
-        //textViewerGlyph.SetXOffset(horizontalScrollBar.Value*zoomFactor);
-        //resize();
         InvalidateVisual();
-        //if (TextViewerSelection.Selection is not null) {
-        //  var selection = TextViewerSelection.Selection;
-        //  SetSelection(null);
-        //  SetSelection(selection);
-        //}
         updateZoomButtonEnabled();
       }
     }
@@ -454,18 +444,9 @@ namespace PdfFilesTextBrowser {
 
 
     private void zoomReset() {
-      //calculate new horizontalScrollBar.Value based on old zoomFactor
-      //it might not be possible to set the new horizontalScrollBar.Value already here, because when zooming in Maximum
-      //might be too small to allow it. Maximum gets adjusted in setHorizontalScrollBar()
-      //var newHorizontalScrollBarValue = horizontalScrollBar.Value / zoomFactor;
       FontSize = ((Control)Parent).FontSize;
       zoomFactor = 1;
       //LogLine2($"zoomReset zoomFactor: {zoomFactor}; Font: {FontSize};");
-      //textViewerGlyph.SetXOffset(horizontalScrollBar.Value*zoomFactor);
-      //setHorizontalScrollBar();
-      //horizontalScrollBar.Value = newHorizontalScrollBarValue;
-      //LogLine($"zoomReset hScrollBar: {horizontalScrollBar.Value:F0};");
-      //resize();
       InvalidateVisual();
       updateZoomButtonEnabled();
     }
@@ -482,13 +463,6 @@ namespace PdfFilesTextBrowser {
         zoomFactor /= zoomStep;
         FontSize = newFontSize;
         //LogLine2($"zoomOut zoomFactor: {zoomFactor}; Font: {FontSize};");
-        //textViewerGlyph.SetXOffset(horizontalScrollBar.Value*zoomFactor);
-        //var horizontalScrollBarValue = horizontalScrollBar.Value;//need to store this value temporarioly because setHorizontalScrollBar
-        ////changes Maximum, which might change Value
-        //setHorizontalScrollBar();
-        //horizontalScrollBar.Value = horizontalScrollBarValue/zoomStep;
-        //LogLine($"zoomOut hScrollBar: {horizontalScrollBar.Value:F0};");
-        //resize();
         InvalidateVisual();
         updateZoomButtonEnabled();
       }
@@ -584,12 +558,10 @@ namespace PdfFilesTextBrowser {
         //selection starts to the left or the right of the displayed lines.
         textOffsetX = Math.Min(Math.Max(textOffsetX-2*FontSize, 0), horizontalScrollBar.Maximum);
 
-        //horizontalScrollBar.Value = Math.Min(startX, horizontalScrollBar.Maximum);
         InvalidateVisual();
         isNoScrolling = false;
       }
       TextViewerSelection.SetSelection(selection, isImmediateRenderingNeeded: isNoScrolling);
-
     }
 
 

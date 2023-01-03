@@ -149,7 +149,8 @@ namespace PdfParserLib {
       string password = "",
       string contentDelimiter = "|",
       byte[]? workingBuffer = null,
-      StringBuilder? stringBuilder = null) {
+      StringBuilder? stringBuilder = null) 
+    {
       bytes = pdBfytes;
       this.password = password;
       trailerDictionaries = new List<DictionaryToken>();
