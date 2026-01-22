@@ -167,7 +167,7 @@ namespace PdfParserLib {
         b = tokeniser.GetNextByte();
       }
       Decimal = sign * value;
-      if (divider<=10) {
+      if (divider<=10 && Decimal<int.MaxValue) {
         Integer = (int)Decimal;
       }
       tokeniser.ValidateDelimiter(Tokeniser.ErrorEnum.Number);

@@ -12,7 +12,7 @@ namespace PdfParserLib {
     public readonly string Filter;
     public readonly int Version;
     public readonly int Revision;
-    public readonly int Permission;
+    public readonly long Permission;
     public readonly int Length;
     public readonly int LengthBytes;
     public readonly byte[] O;
@@ -38,7 +38,7 @@ namespace PdfParserLib {
       Filter = filter;
       Version = v.Integer!.Value;
       Revision = r.Integer!.Value;
-      Permission = p.Integer!.Value;
+      Permission = (long)p.Decimal;
       Length = encryptionDictionary.TryGetNumber("Length", out var lengthToken) ? lengthToken.Integer!.Value : 40;
       LengthBytes = Length / 8;
       TrailerId = ((StringToken)((ArrayToken)idToken!)[0]).HexBytes!;
